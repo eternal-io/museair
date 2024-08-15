@@ -1,4 +1,4 @@
-# MuseAir - New fastest portable hash: immune to blinding multiplication, even faster then wyhash, SMHasher3 passed.
+# <img src="MuseAir-icon-light.png" style="height:1em" /> MuseAir
 
 [![](https://img.shields.io/crates/v/museair)](https://crates.io/crates/museair)
 [![](https://img.shields.io/crates/d/museair)](https://crates.io/crates/museair)
