@@ -61,6 +61,9 @@ They all passed [SMHasher3] with `--extra` option.
 
 And no bad seeds were found (took too long, so only [MuseAir-BFast](./results/SMHasher3_MuseAir-BFast_--extra_--test=BadSeeds.txt) was searched).
 
+The `museair.cpp` in the repository root is for use with SMHasher3, so you can reproduce these results on your computer.
+Since it relies on the entire SMHasher3, it is not very usable in production.
+
 #### Update: They also passed [SMHasher] with `--extra` option, with only a few false positives.
 
 - [MuseAir](results/SMHasher_MuseAir_--extra.txt)
