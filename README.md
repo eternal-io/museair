@@ -56,9 +56,17 @@ They all passed [SMHasher3] with `--extra` option.
 - [MuseAir](results/SMHasher3_MuseAir_--extra.txt)
 - [MuseAir-128](results/SMHasher3_MuseAir-128_--extra.txt)
 - [MuseAir-BFast](results/SMHasher3_MuseAir-BFast_--extra.txt)
-  (While testing this variant, I was gaming, so the `[[[ Speed Tests ]]]` result were actually on the small side :p)
+  (While testing this variant, I was gaming, so the `[[[ Speed Tests ]]]` result were actually on the small side :P)
 - [MuseAir-BFast-128](results/SMHasher3_MuseAir-BFast-128_--extra.txt)
 
+And no bad seeds were found (took too long, so only [MuseAir-BFast](./results/SMHasher3_MuseAir-BFast_--extra_--test=BadSeeds.txt) was searched).
+
+#### Update: They also passed [SMHasher] with `--extra` option, with only a few false positives.
+
+- [MuseAir](results/SMHasher_MuseAir_--extra.txt)
+- [MuseAir-128](results/SMHasher_MuseAir-128_--extra.txt)
+- [MuseAir-BFast](results/SMHasher_MuseAir-BFast_--extra.txt)
+- [MuseAir-BFast-128](results/SMHasher_MuseAir-BFast-128_--extra.txt)
 
 ## Security
 
@@ -77,14 +85,27 @@ The `-BFast` variant will never be stable, you should only use this on local ses
 For persistent storage, you should always use the `-Standard` variant (after it is stable).
 
 
+## Implementations
+
+This repository provides the official Rust implementation of MuseAir. You can find this crate on [crates.io](https://crates.io/crates/museair).
+
+Here is the official C implementation of MuseAir: [museair-c](https://github.com/eternal-io/museair-c).
+
+### Third-party
+
+#### C++
+
+- [museair-cpp](https://github.com/Twilight-Dream-Of-Magic/museair-cpp) (@Twilight-Dream-Of-Magic)
+
+
 ## License
 
-These codes (implementations) are released under the MIT or Apache 2.0 dual license, at your own choice.
+MuseAir algorithm itself is released into the public domain under the CC0 license.
 
-The MuseAir algorithm itself is released into the public domain under the CC0 license.
-
+These codes (implementation) in this repository are released under the MIT or Apache 2.0 dual license, at your option.
 
 
 [WyHash]: https://github.com/wangyi-fudan/wyhash
 [RapidHash]: https://github.com/Nicoshev/rapidhash
 [SMHasher3]: https://gitlab.com/fwojcik/smhasher3
+[SMHasher]: https://github.com/rurban/smhasher
