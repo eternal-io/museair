@@ -6,6 +6,8 @@
 [![](https://img.shields.io/docsrs/museair)](https://docs.rs/museair)
 [![](https://img.shields.io/github/stars/eternal-io/museair?style=social)](https://github.com/eternal-io/museair)
 
+- **Portable**, does NOT rely on machine-specific instructions such as SSE, AVX, CLMUL, CRC32, etc.
+
 - Completely **immune to blinding multiplication**, and accumulates the full 128-bit multiplication results instead of prematurely "compressing" them into 64-bit, this results in *better confusion*.
 
 - **As fast as [WyHash] and its successor [RapidHash]** on bulks, but they suffer from blinding multiplication.
