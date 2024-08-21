@@ -8,21 +8,21 @@
 
 - **Portable**, does NOT rely on machine-specific instructions such as SSE, AVX, CLMUL, CRC32, etc.
 
-- Completely **immune to blinding multiplication**, and accumulates the full 128-bit multiplication results instead of prematurely "compressing" them into 64-bit, this results in *better confusion*.
+- Completely **immune to blinding multiplication**, and accumulates the full 128-bit multiplication results instead of prematurely "compressing" them into 64-bit, this helps maintain the differentiation between consecutive states and *reduces entropy loss*.
 
 - **As fast as [WyHash] and its successor [RapidHash]** on bulks, but they suffer from blinding multiplication.
 
 - Inputs are never simply mixed with constants, and the algorithm correctly implements seeding. This [**prevents seed-independent attacks**](https://github.com/Cyan4973/xxHash/issues/180) and does not require additional `secret[]` to be remedied.
 
-- Inputs are not divided into stripes while processing, this results in *better diffusion*.
+- Inputs are not divided into stripes while processing, this results in *better confusion and diffusion*.
 
 - Produces either **64-bit or 128-bit** results with nearly the **same performance overhead**.
 
 
-Actually, MuseAir has two variants: `-Standard` (this suffix is ​​usually omitted) and `-BFast`.
+Actually, MuseAir has two variants: **Standard** (this suffix is ​​omitted where it does not cause confusion) and **BFast**.
 
-As its name suggests, the `-BFast` variant is faster but *less* immune to blinding multiplication.
-("less" here means when it actually happens, it will only result in the most recent state being lost, rather than all the past state of a stripe being catastrophically lost!)
+As its name suggests, the **BFast** variant is faster but *less* immune to blinding multiplication.
+("less" here means when it actually happens, it will only result in the most recent 8 bytes being lost, rather than all the past state of a stripe being catastrophically lost!)
 
 
 ## Benchmarks
@@ -66,12 +66,15 @@ And no bad seeds were found (took too long, so only [MuseAir-BFast](./results/SM
 The `museair.cpp` in the repository root is for use with SMHasher3, so you can reproduce these results on your computer.
 Since it relies on the entire SMHasher3, it is not very usable in production.
 
-#### Update: They also passed [SMHasher] with `--extra` option, with only a few false positives.
+#### Update: They also passed [SMHasher] with `--extra` option, with only one false positive.
 
 - [MuseAir](results/SMHasher_MuseAir_--extra.txt)
 - [MuseAir-128](results/SMHasher_MuseAir-128_--extra.txt)
 - [MuseAir-BFast](results/SMHasher_MuseAir-BFast_--extra.txt)
 - [MuseAir-BFast-128](results/SMHasher_MuseAir-BFast-128_--extra.txt)
+
+(For keys shorter than 16 bytes, MuseAir and MuseAir-BFast have the same output.)
+
 
 ## Security
 
@@ -83,24 +86,22 @@ MuseAir is ***NOT*** intended for cryptographic security.
 
 ## Versioning policy
 
-The `-Standard` variant (functions listed in the crate root) is not scheduled to be stable until version 1.0.0 is released.
-That is, the result of the hash may change from minor version to minor version. Don't use it for persistent storage yet.
+The **Standard** variant (functions listed in the crate root) is not scheduled to be stable until version 1.0.0 is released.
+That is, the result of the hash may change from minor version to minor version. Don't use it for persistent storage *yet*.
 
-The `-BFast` variant will never be stable, you should only use this on local sessions.
-For persistent storage, you should always use the `-Standard` variant (after it is stable).
+The **BFast** variant will never be stable, you should only use this on local sessions.
 
 
 ## Implementations
 
 This repository provides the official Rust implementation of MuseAir. You can find this crate on [crates.io](https://crates.io/crates/museair).
 
-Here is the official C implementation of MuseAir: [museair-c](https://github.com/eternal-io/museair-c).
+### 0.2
 
-### Third-party
-
-#### C++
-
-- [museair-cpp](https://github.com/Twilight-Dream-Of-Magic/museair-cpp) (@Twilight-Dream-Of-Magic)
+| Language | Author                  | Link                                                     |
+|:-------- |:----------------------- |:-------------------------------------------------------- |
+| **C**    | K--Aethiax              | <https://github.com/eternal-io/museair-c>                |
+| **C++**  | Twilight-Dream-Of-Magic | <https://github.com/Twilight-Dream-Of-Magic/museair-cpp> |
 
 
 ## License
