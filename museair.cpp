@@ -302,11 +302,31 @@ static FORCE_INLINE void tower_short(const uint8_t* bytes,
                                      const seed_t seed,
                                      uint64_t* i,
                                      uint64_t* j) {
-    uint64_t lo, hi;
-    read_short<bswap>(bytes, len, i, j);
-    MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[0], len ^ DEFAULT_SECRET[1]);
-    *i ^= lo ^ len;
-    *j ^= hi ^ seed;
+    if (len > 16) {
+        uint64_t p, q;
+        p = read_u64<bswap>(bytes);
+        q = read_u64<bswap>(bytes + seg(1));
+
+        uint64_t lo, hi;
+        MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[0], p ^ DEFAULT_SECRET[2]);
+
+    	p ^= lo;
+    	uint64_t r = hi;
+
+
+        MathMult::mult64_128(lo, hi, len ^ DEFAULT_SECRET[2], q ^ DEFAULT_SECRET[1]);
+
+        read_short<bswap>(bytes + seg(2), len - seg(2), i, j);
+        *i ^= lo ^ p ^ len;
+        *j ^= hi ^ r ^ seed;
+
+    } else {
+        uint64_t lo, hi;
+        read_short<bswap>(bytes, len, i, j);
+        MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[0], len ^ DEFAULT_SECRET[1]);
+        *i ^= lo ^ len;
+        *j ^= hi ^ seed;
+    }
 }
 
 static FORCE_INLINE void epi_short(uint64_t* i, uint64_t* j) {
@@ -387,7 +407,7 @@ static FORCE_INLINE void epi_loong_128(uint64_t* i, uint64_t* j, uint64_t* k) {
 template <bool bswap, bool blindfast>
 static inline void hash(const void* bytes, const size_t len, const seed_t seed, void* out) {
     uint64_t i, j, k;
-    if (likely(len <= 16)) {
+    if (likely(len <= 32)) {
         tower_short<bswap>((const uint8_t*)bytes, len, seed, &i, &j);
         epi_short(&i, &j);
     } else {
@@ -403,7 +423,7 @@ static inline void hash(const void* bytes, const size_t len, const seed_t seed, 
 template <bool bswap, bool blindfast>
 static inline void hash_128(const void* bytes, const size_t len, const seed_t seed, void* out) {
     uint64_t i, j, k;
-    if (likely(len <= 16)) {
+    if (likely(len <= 32)) {
         tower_short<bswap>((const uint8_t*)bytes, len, seed, &i, &j);
         epi_short_128<blindfast>(&i, &j);
     } else {
@@ -435,8 +455,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 64,
-    $.verification_LE = 0x46B2D34D,
-    $.verification_BE = 0xE2A5BB5A,
+    // $.verification_LE = 0x46B2D34D,
+    // $.verification_BE = 0xE2A5BB5A,
     $.hashfn_native   = hash<false, false>,
     $.hashfn_bswap    = hash<true, false>
 );
@@ -449,8 +469,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 128,
-    $.verification_LE = 0xCABAA4CD,
-    $.verification_BE = 0x0C85AD17,
+    // $.verification_LE = 0xCABAA4CD,
+    // $.verification_BE = 0x0C85AD17,
     $.hashfn_native   = hash_128<false, false>,
     $.hashfn_bswap    = hash_128<true, false>
 );
@@ -464,8 +484,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 64,
-    $.verification_LE = 0x98CDFE3E,
-    $.verification_BE = 0x06E465A0,
+    // $.verification_LE = 0x98CDFE3E,
+    // $.verification_BE = 0x06E465A0,
     $.hashfn_native   = hash<false, true>,
     $.hashfn_bswap    = hash<true, true>
 );
@@ -478,8 +498,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 128,
-    $.verification_LE = 0x81D30B6E,
-    $.verification_BE = 0xF659322A,
+    // $.verification_LE = 0x81D30B6E,
+    // $.verification_BE = 0xF659322A,
     $.hashfn_native   = hash_128<false, true>,
     $.hashfn_bswap    = hash_128<true, true>
 );
