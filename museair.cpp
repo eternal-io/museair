@@ -302,30 +302,31 @@ static FORCE_INLINE void tower_short(const uint8_t* bytes,
                                      const seed_t seed,
                                      uint64_t* i,
                                      uint64_t* j) {
-    if (len > 16) {
-        uint64_t p, q;
-        p = read_u64<bswap>(bytes);
-        q = read_u64<bswap>(bytes + seg(1));
+    if (likely(len <= 16)) {
 
-        uint64_t lo, hi;
-        MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[0], p ^ DEFAULT_SECRET[2]);
-
-    	p ^= lo;
-    	uint64_t r = hi;
-
-
-        MathMult::mult64_128(lo, hi, len ^ DEFAULT_SECRET[2], q ^ DEFAULT_SECRET[1]);
-
-        read_short<bswap>(bytes + seg(2), len - seg(2), i, j);
-        *i ^= lo ^ p ^ len;
-        *j ^= hi ^ r ^ seed;
-
-    } else {
         uint64_t lo, hi;
         read_short<bswap>(bytes, len, i, j);
         MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[0], len ^ DEFAULT_SECRET[1]);
         *i ^= lo ^ len;
         *j ^= hi ^ seed;
+    } else {
+        uint64_t p, q;
+        p = read_u64<bswap>(bytes);
+        q = read_u64<bswap>(bytes + seg(1));
+
+        uint64_t lo, hi;
+        MathMult::mult64_128(lo, hi, len ^ DEFAULT_SECRET[0], p ^ DEFAULT_SECRET[2]);
+
+        p = lo;
+        uint64_t r = hi;
+
+        MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[2], q ^ DEFAULT_SECRET[1]);
+
+        read_short<bswap>(bytes + seg(2), len - seg(2), i, j);
+
+        // XOR would fail the tests, use ADD for better mixing effect
+        *i ^= p + hi;
+        *j ^= r + lo;
     }
 }
 
