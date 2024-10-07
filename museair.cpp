@@ -322,8 +322,8 @@ static FORCE_INLINE void tower_short(const uint8_t* bytes,
         MathMult::mult64_128(lo, hi, len ^ DEFAULT_SECRET[2], q ^ DEFAULT_SECRET[1]);
 
         read_short<bswap>(bytes + seg(2), len - seg(2), i, j);
-        *i ^= lo ^ p ^ len;
-        *j ^= hi ^ r ^ seed;
+        *i ^= lo ^ p;
+        *j ^= hi ^ r;
     }
 }
 
