@@ -40,8 +40,7 @@
 
 #include "Mathmult.h"
 
-#define HASH_ALGORITHM_VERSION "0.2"
-#define HASH_ALGORITHM_BFAST_VERSION "0.2"
+#define HASH_ALGORITHM_VERSION "0.3-rc1"
 
 static const uint64_t DEFAULT_SECRET[6] = {
     UINT64_C(0x5ae31e589c56e17a), UINT64_C(0x96d7bb04e64f6da9), UINT64_C(0x7ab1006b26f9eb64),
@@ -61,7 +60,6 @@ static FORCE_INLINE uint64_t read_u32(const uint8_t* p) {
 }
 template <bool bswap>
 static FORCE_INLINE void read_short(const uint8_t* bytes, const size_t len, uint64_t* i, uint64_t* j) {
-    // For short inputs, refer to rapidhash, MuseAir has no much different from that.
     if (len >= 4) {
         int off = (len & 24) >> (len >> 3);  // len >= 8 ? 4 : 0
         *i = (read_u32<bswap>(bytes) << 32) | read_u32<bswap>(bytes + len - 4);
@@ -225,11 +223,6 @@ _tower_layer_0(uint64_t* state, const uint8_t* p, size_t q, size_t len, uint64_t
 }
 template <bool blindfast>
 static FORCE_INLINE void _tower_layer_x(const size_t tot_len, uint64_t* i, uint64_t* j, uint64_t* k) {
-    // 首先，`tower_loong`不得内联，否则对于所有大小的输入都会变慢。
-    // 这个函数如果放在`tower_loong`里，那么对于 bulk 而言总是能够提速 ~1 GiB/s。
-    // 这个函数如果放在`epi_loong_*`里，那么对小于 16-bytes 的 key 而言会慢 ~2 cyc，对大于 16-bytes 的 key 而言会快 ~3 cyc。
-    // 目前 MuseAir 最大的亮点是对 bulk 的处理速度，所以这个函数应该放在`tower_loong`里。
-    // 这些特性可能是机器特定的，或与缓存性能相关。但我想，不论如何，想办法让`tower_short`能够处理更长的 key 才是最好的解决方案。
     int rot = tot_len & 63;
     uint64_t lo0, lo1, lo2;
     uint64_t hi0, hi1, hi2;
@@ -302,11 +295,22 @@ static FORCE_INLINE void tower_short(const uint8_t* bytes,
                                      const seed_t seed,
                                      uint64_t* i,
                                      uint64_t* j) {
-    uint64_t lo, hi;
-    read_short<bswap>(bytes, len, i, j);
-    MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[0], len ^ DEFAULT_SECRET[1]);
-    *i ^= lo ^ len;
-    *j ^= hi ^ seed;
+    if (likely(len <= 16)) {
+        uint64_t lo, hi;
+        read_short<bswap>(bytes, len, i, j);
+        MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[0], len ^ DEFAULT_SECRET[1]);
+        *i ^= lo ^ len;
+        *j ^= hi ^ seed;
+    } else {
+        uint64_t lo0, hi0, p = read_u64<bswap>(bytes + seg(0));
+        uint64_t lo1, hi1, q = read_u64<bswap>(bytes + seg(1));
+        read_short<bswap>(bytes + seg(2), len - seg(2), i, j);
+        // It seems faster to use these constants (indexing) in ascending order...
+        MathMult::mult64_128(lo0, hi0, seed ^ DEFAULT_SECRET[2], p ^ DEFAULT_SECRET[3]);
+        MathMult::mult64_128(lo1, hi1, len ^ DEFAULT_SECRET[4], q ^ DEFAULT_SECRET[5]);
+        *i ^= lo0 ^ hi1 ^ len;
+        *j ^= lo1 ^ hi0 ^ seed;
+    }
 }
 
 static FORCE_INLINE void epi_short(uint64_t* i, uint64_t* j) {
@@ -387,7 +391,7 @@ static FORCE_INLINE void epi_loong_128(uint64_t* i, uint64_t* j, uint64_t* k) {
 template <bool bswap, bool blindfast>
 static inline void hash(const void* bytes, const size_t len, const seed_t seed, void* out) {
     uint64_t i, j, k;
-    if (likely(len <= 16)) {
+    if (likely(len <= 32)) {
         tower_short<bswap>((const uint8_t*)bytes, len, seed, &i, &j);
         epi_short(&i, &j);
     } else {
@@ -403,7 +407,7 @@ static inline void hash(const void* bytes, const size_t len, const seed_t seed, 
 template <bool bswap, bool blindfast>
 static inline void hash_128(const void* bytes, const size_t len, const seed_t seed, void* out) {
     uint64_t i, j, k;
-    if (likely(len <= 16)) {
+    if (likely(len <= 32)) {
         tower_short<bswap>((const uint8_t*)bytes, len, seed, &i, &j);
         epi_short_128<blindfast>(&i, &j);
     } else {
@@ -435,8 +439,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 64,
-    $.verification_LE = 0x46B2D34D,
-    $.verification_BE = 0xE2A5BB5A,
+    $.verification_LE = 0x168CD5A3,
+    $.verification_BE = 0xA6B155DA,
     $.hashfn_native   = hash<false, false>,
     $.hashfn_bswap    = hash<true, false>
 );
@@ -449,37 +453,37 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 128,
-    $.verification_LE = 0xCABAA4CD,
-    $.verification_BE = 0x0C85AD17,
+    $.verification_LE = 0x5973DB6E,
+    $.verification_BE = 0xB97C5087,
     $.hashfn_native   = hash_128<false, false>,
     $.hashfn_bswap    = hash_128<true, false>
 );
 
 REGISTER_HASH(
     MuseAir_BFast,
-    $.desc       = "MuseAir hash BFast variant v" HASH_ALGORITHM_BFAST_VERSION " @ 64-bit output",
+    $.desc       = "MuseAir hash BFast variant v" HASH_ALGORITHM_VERSION " @ 64-bit output",
     $.hash_flags = 0,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 64,
-    $.verification_LE = 0x98CDFE3E,
-    $.verification_BE = 0x06E465A0,
+    $.verification_LE = 0x2275E0E5,
+    $.verification_BE = 0x3E98E2CB,
     $.hashfn_native   = hash<false, true>,
     $.hashfn_bswap    = hash<true, true>
 );
 REGISTER_HASH(
     MuseAir_BFast_128,
-    $.desc       = "MuseAir hash BFast variant v" HASH_ALGORITHM_BFAST_VERSION " @ 128-bit output",
+    $.desc       = "MuseAir hash BFast variant v" HASH_ALGORITHM_VERSION " @ 128-bit output",
     $.hash_flags = 0,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 128,
-    $.verification_LE = 0x81D30B6E,
-    $.verification_BE = 0xF659322A,
+    $.verification_LE = 0xE9413C41,
+    $.verification_BE = 0xD2BEA9C1,
     $.hashfn_native   = hash_128<false, true>,
     $.hashfn_bswap    = hash_128<true, true>
 );
