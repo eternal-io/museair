@@ -40,7 +40,7 @@
 
 #include "Mathmult.h"
 
-#define HASH_ALGORITHM_VERSION "0.3"
+#define HASH_ALGORITHM_VERSION "0.3-rc1"
 
 static const uint64_t DEFAULT_SECRET[6] = {
     UINT64_C(0x5ae31e589c56e17a), UINT64_C(0x96d7bb04e64f6da9), UINT64_C(0x7ab1006b26f9eb64),
@@ -60,7 +60,6 @@ static FORCE_INLINE uint64_t read_u32(const uint8_t* p) {
 }
 template <bool bswap>
 static FORCE_INLINE void read_short(const uint8_t* bytes, const size_t len, uint64_t* i, uint64_t* j) {
-    // For short inputs, refer to rapidhash, MuseAir has no much different from that.
     if (len >= 4) {
         int off = (len & 24) >> (len >> 3);  // len >= 8 ? 4 : 0
         *i = (read_u32<bswap>(bytes) << 32) | read_u32<bswap>(bytes + len - 4);
@@ -303,13 +302,14 @@ static FORCE_INLINE void tower_short(const uint8_t* bytes,
         *i ^= lo ^ len;
         *j ^= hi ^ seed;
     } else {
-        uint64_t lo0, hi0, p = read_u64<bswap>(bytes);
+        uint64_t lo0, hi0, p = read_u64<bswap>(bytes + seg(0));
         uint64_t lo1, hi1, q = read_u64<bswap>(bytes + seg(1));
-        MathMult::mult64_128(lo0, hi0, seed ^ DEFAULT_SECRET[0], p ^ DEFAULT_SECRET[2]);
-        MathMult::mult64_128(lo1, hi1, len ^ DEFAULT_SECRET[2], q ^ DEFAULT_SECRET[1]);
         read_short<bswap>(bytes + seg(2), len - seg(2), i, j);
-        *i ^= lo1 ^ lo0 ^ p ^ len;
-        *j ^= hi1 ^ hi0 ^ seed;
+        // It seems faster to use these constants (indexing) in ascending order...
+        MathMult::mult64_128(lo0, hi0, seed ^ DEFAULT_SECRET[2], p ^ DEFAULT_SECRET[3]);
+        MathMult::mult64_128(lo1, hi1, len ^ DEFAULT_SECRET[4], q ^ DEFAULT_SECRET[5]);
+        *i ^= lo0 ^ hi1 ^ len;
+        *j ^= lo1 ^ hi0 ^ seed;
     }
 }
 
@@ -439,8 +439,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 64,
-    $.verification_LE = 0xF7C3D7AB,
-    $.verification_BE = 0,
+    $.verification_LE = 0x168CD5A3,
+    $.verification_BE = 0xA6B155DA,
     $.hashfn_native   = hash<false, false>,
     $.hashfn_bswap    = hash<true, false>
 );
@@ -453,8 +453,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 128,
-    $.verification_LE = 0,
-    $.verification_BE = 0,
+    $.verification_LE = 0x5973DB6E,
+    $.verification_BE = 0xB97C5087,
     $.hashfn_native   = hash_128<false, false>,
     $.hashfn_bswap    = hash_128<true, false>
 );
@@ -468,8 +468,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 64,
-    $.verification_LE = 0,
-    $.verification_BE = 0,
+    $.verification_LE = 0x2275E0E5,
+    $.verification_BE = 0x3E98E2CB,
     $.hashfn_native   = hash<false, true>,
     $.hashfn_bswap    = hash<true, true>
 );
@@ -482,8 +482,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 128,
-    $.verification_LE = 0,
-    $.verification_BE = 0,
+    $.verification_LE = 0xE9413C41,
+    $.verification_BE = 0xD2BEA9C1,
     $.hashfn_native   = hash_128<false, true>,
     $.hashfn_bswap    = hash_128<true, true>
 );
