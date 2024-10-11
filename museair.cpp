@@ -304,8 +304,9 @@ static FORCE_INLINE void tower_short(const uint8_t* bytes,
     } else {
         *i = read_u64<bswap>(bytes + seg(0));
         *j = read_u64<bswap>(bytes + seg(1));
-        uint64_t lo0, hi0, p = read_u64<bswap>(bytes + len - seg(2));
-        uint64_t lo1, hi1, q = read_u64<bswap>(bytes + len - seg(1));
+        uint64_t lo0, hi0, p;
+        uint64_t lo1, hi1, q;
+        read_short<bswap>(bytes+seg(2), len+seg(2), &p, &q);
         MathMult::mult64_128(lo0, hi0, DEFAULT_SECRET[2], p ^ DEFAULT_SECRET[3]);
         MathMult::mult64_128(lo1, hi1, DEFAULT_SECRET[4], q ^ DEFAULT_SECRET[5]);
         *i ^= lo ^ lo0 ^ hi1;
