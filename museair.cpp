@@ -40,15 +40,17 @@
 
 #include "Mathmult.h"
 
-#define HASH_ALGORITHM_VERSION "0.3-rc2"
+#define HASH_ALGORITHM_VERSION "0.3-rc3"
 
-static const uint64_t DEFAULT_SECRET[6] = {
+// `AiryAi(0)` mantissa calculated by Y-Cruncher. (0..48)
+static const uint64_t CONSTANT[6] = {
     UINT64_C(0x5ae31e589c56e17a), UINT64_C(0x96d7bb04e64f6da9), UINT64_C(0x7ab1006b26f9eb64),
     UINT64_C(0x21233394220b8457), UINT64_C(0x047cb9557c9f3b43), UINT64_C(0xd24f2590c0bcee28),
 };
+// `AiryAi(0)` mantissa calculated by Y-Cruncher. (48..56)
 static const uint64_t INIT_RING_PREV = UINT64_C(0x33ea8f71bb6016d8);
 
-#define seg(N) N * 8
+#define u64x(N) N * 8
 
 template <bool bswap>
 static FORCE_INLINE uint64_t read_u64(const uint8_t* p) {
@@ -77,10 +79,10 @@ static FORCE_INLINE void read_short(const uint8_t* bytes, const size_t len, uint
     }
 }
 
-template <bool blindfast>
+template <bool bfast>
 static FORCE_INLINE void _frac_6(uint64_t* state_p, uint64_t* state_q, const uint64_t input_p, const uint64_t input_q) {
     uint64_t lo, hi;
-    if (!blindfast) {
+    if (!bfast) {
         *state_p ^= input_p;
         *state_q ^= input_q;
         MathMult::mult64_128(lo, hi, *state_p, *state_q);
@@ -92,16 +94,17 @@ static FORCE_INLINE void _frac_6(uint64_t* state_p, uint64_t* state_q, const uin
         *state_q = hi;
     }
 }
-template <bool blindfast>
+template <bool bfast>
 static FORCE_INLINE void _frac_3(uint64_t* state_p, uint64_t* state_q, const uint64_t input) {
     uint64_t lo, hi;
-    if (!blindfast) {
+    if (!bfast) {
         *state_q ^= input;
         MathMult::mult64_128(lo, hi, *state_p, *state_q);
         *state_p ^= lo;
         *state_q ^= hi;
     } else {
-        MathMult::mult64_128(lo, hi, *state_p, *state_q ^ input);
+        MathMult::mult64_128(lo, hi, *state_p,
+                             *state_q ^ input);  // TODO: 把 ^ input 移到左边以免最初的时候受到脏种子影响！！
         *state_p = lo;
         *state_q = hi;
     }
@@ -115,89 +118,93 @@ static FORCE_INLINE void _chixx(uint64_t* t, uint64_t* u, uint64_t* v) {
     *v ^= z;
 }
 
-template <bool bswap, bool blindfast>
+template <bool bswap, bool bfast>
 static FORCE_INLINE void _tower_layer_12(uint64_t* state, const uint8_t* p, uint64_t* ring_prev) {
     uint64_t lo0, lo1, lo2, lo3, lo4, lo5;
     uint64_t hi0, hi1, hi2, hi3, hi4, hi5;
-    if (!blindfast) {
-        state[0] ^= read_u64<bswap>(p + seg(0));
-        state[1] ^= read_u64<bswap>(p + seg(1));
+    if (!bfast) {
+        state[0] ^= read_u64<bswap>(p + u64x(0));
+        state[1] ^= read_u64<bswap>(p + u64x(1));
         MathMult::mult64_128(lo0, hi0, state[0], state[1]);
         state[0] += *ring_prev ^ hi0;
 
-        state[1] ^= read_u64<bswap>(p + seg(2));
-        state[2] ^= read_u64<bswap>(p + seg(3));
+        state[1] ^= read_u64<bswap>(p + u64x(2));
+        state[2] ^= read_u64<bswap>(p + u64x(3));
         MathMult::mult64_128(lo1, hi1, state[1], state[2]);
         state[1] += lo0 ^ hi1;
 
-        state[2] ^= read_u64<bswap>(p + seg(4));
-        state[3] ^= read_u64<bswap>(p + seg(5));
+        state[2] ^= read_u64<bswap>(p + u64x(4));
+        state[3] ^= read_u64<bswap>(p + u64x(5));
         MathMult::mult64_128(lo2, hi2, state[2], state[3]);
         state[2] += lo1 ^ hi2;
 
-        state[3] ^= read_u64<bswap>(p + seg(6));
-        state[4] ^= read_u64<bswap>(p + seg(7));
+        state[3] ^= read_u64<bswap>(p + u64x(6));
+        state[4] ^= read_u64<bswap>(p + u64x(7));
         MathMult::mult64_128(lo3, hi3, state[3], state[4]);
         state[3] += lo2 ^ hi3;
 
-        state[4] ^= read_u64<bswap>(p + seg(8));
-        state[5] ^= read_u64<bswap>(p + seg(9));
+        state[4] ^= read_u64<bswap>(p + u64x(8));
+        state[5] ^= read_u64<bswap>(p + u64x(9));
         MathMult::mult64_128(lo4, hi4, state[4], state[5]);
         state[4] += lo3 ^ hi4;
 
-        state[5] ^= read_u64<bswap>(p + seg(10));
-        state[0] ^= read_u64<bswap>(p + seg(11));
+        state[5] ^= read_u64<bswap>(p + u64x(10));
+        state[0] ^= read_u64<bswap>(p + u64x(11));
         MathMult::mult64_128(lo5, hi5, state[5], state[0]);
         state[5] += lo4 ^ hi5;
     } else {
-        state[0] ^= read_u64<bswap>(p + seg(0));
-        state[1] ^= read_u64<bswap>(p + seg(1));
+        state[0] ^= read_u64<bswap>(p + u64x(0));
+        state[1] ^= read_u64<bswap>(p + u64x(1));
         MathMult::mult64_128(lo0, hi0, state[0], state[1]);
         state[0] = *ring_prev ^ hi0;
 
-        state[1] ^= read_u64<bswap>(p + seg(2));
-        state[2] ^= read_u64<bswap>(p + seg(3));
+        state[1] ^= read_u64<bswap>(p + u64x(2));
+        state[2] ^= read_u64<bswap>(p + u64x(3));
         MathMult::mult64_128(lo1, hi1, state[1], state[2]);
         state[1] = lo0 ^ hi1;
 
-        state[2] ^= read_u64<bswap>(p + seg(4));
-        state[3] ^= read_u64<bswap>(p + seg(5));
+        state[2] ^= read_u64<bswap>(p + u64x(4));
+        state[3] ^= read_u64<bswap>(p + u64x(5));
         MathMult::mult64_128(lo2, hi2, state[2], state[3]);
         state[2] = lo1 ^ hi2;
 
-        state[3] ^= read_u64<bswap>(p + seg(6));
-        state[4] ^= read_u64<bswap>(p + seg(7));
+        state[3] ^= read_u64<bswap>(p + u64x(6));
+        state[4] ^= read_u64<bswap>(p + u64x(7));
         MathMult::mult64_128(lo3, hi3, state[3], state[4]);
         state[3] = lo2 ^ hi3;
 
-        state[4] ^= read_u64<bswap>(p + seg(8));
-        state[5] ^= read_u64<bswap>(p + seg(9));
+        state[4] ^= read_u64<bswap>(p + u64x(8));
+        state[5] ^= read_u64<bswap>(p + u64x(9));
         MathMult::mult64_128(lo4, hi4, state[4], state[5]);
         state[4] = lo3 ^ hi4;
 
-        state[5] ^= read_u64<bswap>(p + seg(10));
-        state[0] ^= read_u64<bswap>(p + seg(11));
+        state[5] ^= read_u64<bswap>(p + u64x(10));
+        state[0] ^= read_u64<bswap>(p + u64x(11));
         MathMult::mult64_128(lo5, hi5, state[5], state[0]);
         state[5] = lo4 ^ hi5;
     }
     *ring_prev = lo5;
 }
-template <bool bswap, bool blindfast>
+template <bool bswap, bool bfast>
 static FORCE_INLINE void _tower_layer_6(uint64_t* state, const uint8_t* p) {
-    _frac_6<blindfast>(&state[0], &state[1], read_u64<bswap>(p + seg(0)), read_u64<bswap>(p + seg(1)));
-    _frac_6<blindfast>(&state[2], &state[3], read_u64<bswap>(p + seg(2)), read_u64<bswap>(p + seg(3)));
-    _frac_6<blindfast>(&state[4], &state[5], read_u64<bswap>(p + seg(4)), read_u64<bswap>(p + seg(5)));
+    _frac_6<bfast>(&state[0], &state[1], read_u64<bswap>(p + u64x(0)), read_u64<bswap>(p + u64x(1)));
+    _frac_6<bfast>(&state[2], &state[3], read_u64<bswap>(p + u64x(2)), read_u64<bswap>(p + u64x(3)));
+    _frac_6<bfast>(&state[4], &state[5], read_u64<bswap>(p + u64x(4)), read_u64<bswap>(p + u64x(5)));
 }
-template <bool bswap, bool blindfast>
+template <bool bswap, bool bfast>
 static FORCE_INLINE void _tower_layer_3(uint64_t* state, const uint8_t* p) {
-    _frac_3<blindfast>(&state[0], &state[3], read_u64<bswap>(p + seg(0)));
-    _frac_3<blindfast>(&state[1], &state[4], read_u64<bswap>(p + seg(1)));
-    _frac_3<blindfast>(&state[2], &state[5], read_u64<bswap>(p + seg(2)));
+    _frac_3<bfast>(&state[0], &state[3], read_u64<bswap>(p + u64x(0)));
+    _frac_3<bfast>(&state[1], &state[4], read_u64<bswap>(p + u64x(1)));
+    _frac_3<bfast>(&state[2], &state[5], read_u64<bswap>(p + u64x(2)));
 }
 template <bool bswap>
-static FORCE_INLINE void
-_tower_layer_0(uint64_t* state, const uint8_t* p, size_t q, size_t len, uint64_t* i, uint64_t* j, uint64_t* k) {
-    if (q <= seg(2)) {
+static FORCE_INLINE void _tower_layer_0(uint64_t* state,
+                                        const uint8_t* p,
+                                        size_t q,
+                                        uint64_t* i,
+                                        uint64_t* j,
+                                        uint64_t* k) {
+    if (q <= u64x(2)) {
         uint64_t i_, j_;
         read_short<bswap>(p, q, &i_, &j_);
         *i = i_;
@@ -205,23 +212,17 @@ _tower_layer_0(uint64_t* state, const uint8_t* p, size_t q, size_t len, uint64_t
         *k = 0;
     } else {
         *i = read_u64<bswap>(p);
-        *j = read_u64<bswap>(p + seg(1));
-        *k = read_u64<bswap>(p + q - seg(1));
+        *j = read_u64<bswap>(p + u64x(1));
+        *k = read_u64<bswap>(p + q - u64x(1));
     }
 
-    if (len >= seg(3)) {
-        _chixx(&state[0], &state[2], &state[4]);
-        _chixx(&state[1], &state[3], &state[5]);
-        *i ^= state[0] + state[1];
-        *j ^= state[2] + state[3];
-        *k ^= state[4] + state[5];
-    } else {
-        *i ^= state[0];
-        *j ^= state[1];
-        *k ^= state[2];
-    }
+    _chixx(&state[0], &state[2], &state[4]);
+    _chixx(&state[1], &state[3], &state[5]);
+    *i ^= state[0] + state[1];
+    *j ^= state[2] + state[3];
+    *k ^= state[4] + state[5];
 }
-template <bool blindfast>
+template <bool bfast>
 static FORCE_INLINE void _tower_layer_x(const size_t tot_len, uint64_t* i, uint64_t* j, uint64_t* k) {
     int rot = tot_len & 63;
     uint64_t lo0, lo1, lo2;
@@ -230,10 +231,10 @@ static FORCE_INLINE void _tower_layer_x(const size_t tot_len, uint64_t* i, uint6
     *i = ROTL64(*i, rot);
     *j = ROTR64(*j, rot);
     *k ^= tot_len;
-    if (!blindfast) {
-        MathMult::mult64_128(lo0, hi0, *i ^ DEFAULT_SECRET[3], *j);
-        MathMult::mult64_128(lo1, hi1, *j ^ DEFAULT_SECRET[4], *k);
-        MathMult::mult64_128(lo2, hi2, *k ^ DEFAULT_SECRET[5], *i);
+    if (!bfast) {
+        MathMult::mult64_128(lo0, hi0, *i ^ CONSTANT[3], *j);
+        MathMult::mult64_128(lo1, hi1, *j ^ CONSTANT[4], *k);
+        MathMult::mult64_128(lo2, hi2, *k ^ CONSTANT[5], *i);
         *i ^= lo0 ^ hi2;
         *j ^= lo1 ^ hi0;
         *k ^= lo2 ^ hi1;
@@ -247,7 +248,7 @@ static FORCE_INLINE void _tower_layer_x(const size_t tot_len, uint64_t* i, uint6
     }
 }
 
-template <bool bswap, bool blindfast>
+template <bool bswap, bool bfast>
 static NEVER_INLINE void tower_loong(const uint8_t* bytes,
                                      const size_t len,
                                      const seed_t seed,
@@ -257,36 +258,40 @@ static NEVER_INLINE void tower_loong(const uint8_t* bytes,
     const uint8_t* p = bytes;
     size_t q = len;
 
-    uint64_t state[6] = {DEFAULT_SECRET[0] + seed, DEFAULT_SECRET[1] - seed, DEFAULT_SECRET[2] ^ seed,
-                         DEFAULT_SECRET[3],        DEFAULT_SECRET[4],        DEFAULT_SECRET[5]};
+    uint64_t state[6] = {CONSTANT[0] + seed, CONSTANT[1] - seed, CONSTANT[2] ^ seed,
+                         CONSTANT[3],        CONSTANT[4],        CONSTANT[5]};
 
-    if (q >= seg(12)) {
+    if (q >= u64x(12)) {
         state[3] += seed;
         state[4] -= seed;
         state[5] ^= seed;
+
         uint64_t ring_prev = INIT_RING_PREV;
+
         do {
-            _tower_layer_12<bswap, blindfast>(&state[0], p, &ring_prev);
-            p += seg(12);
-            q -= seg(12);
-        } while (likely(q >= seg(12)));
+            _tower_layer_12<bswap, bfast>(&state[0], p, &ring_prev);
+            p += u64x(12);
+            q -= u64x(12);
+        } while (likely(q >= u64x(12)));
+
         state[0] ^= ring_prev;
     }
 
-    if (q >= seg(6)) {
-        _tower_layer_6<bswap, blindfast>(&state[0], p);
-        p += seg(6);
-        q -= seg(6);
+    if (q >= u64x(6)) {
+        _tower_layer_6<bswap, bfast>(&state[0], p);
+        p += u64x(6);
+        q -= u64x(6);
     }
 
-    if (q >= seg(3)) {
-        _tower_layer_3<bswap, blindfast>(&state[0], p);
-        p += seg(3);
-        q -= seg(3);
+    if (q >= u64x(3)) {
+        _tower_layer_3<bswap, bfast>(&state[0], p);
+        p += u64x(3);
+        q -= u64x(3);
     }
 
-    _tower_layer_0<bswap>(&state[0], p, q, len, i, j, k);
-    _tower_layer_x<blindfast>(len, i, j, k);
+    _tower_layer_0<bswap>(&state[0], p, q, i, j, k);
+
+    _tower_layer_x<bfast>(len, i, j, k);
 }
 
 template <bool bswap>
@@ -296,18 +301,18 @@ static FORCE_INLINE void tower_short(const uint8_t* bytes,
                                      uint64_t* i,
                                      uint64_t* j) {
     uint64_t lo, hi;
-    MathMult::mult64_128(lo, hi, seed ^ DEFAULT_SECRET[0], len ^ DEFAULT_SECRET[1]);
+    MathMult::mult64_128(lo, hi, seed ^ CONSTANT[0], len ^ CONSTANT[1]);
     if (likely(len <= 16)) {
         read_short<bswap>(bytes, len, i, j);
         *i ^= lo ^ len;
         *j ^= hi ^ seed;
     } else {
-        *i = read_u64<bswap>(bytes + seg(0));
-        *j = read_u64<bswap>(bytes + seg(1));
-        uint64_t lo0, hi0, p = read_u64<bswap>(bytes + len - seg(2));
-        uint64_t lo1, hi1, q = read_u64<bswap>(bytes + len - seg(1));
-        MathMult::mult64_128(lo0, hi0, DEFAULT_SECRET[2], p ^ DEFAULT_SECRET[3]);
-        MathMult::mult64_128(lo1, hi1, DEFAULT_SECRET[4], q ^ DEFAULT_SECRET[5]);
+        *i = read_u64<bswap>(bytes + u64x(0));
+        *j = read_u64<bswap>(bytes + u64x(1));
+        uint64_t lo0, hi0, p = read_u64<bswap>(bytes + len - u64x(2));
+        uint64_t lo1, hi1, q = read_u64<bswap>(bytes + len - u64x(1));
+        MathMult::mult64_128(lo0, hi0, CONSTANT[2], p ^ CONSTANT[3]);
+        MathMult::mult64_128(lo1, hi1, CONSTANT[4], q ^ CONSTANT[5]);
         *i ^= lo ^ lo0 ^ hi1;
         *j ^= hi ^ lo1 ^ hi0;
     }
@@ -315,47 +320,48 @@ static FORCE_INLINE void tower_short(const uint8_t* bytes,
 
 static FORCE_INLINE void epi_short(uint64_t* i, uint64_t* j) {
     uint64_t lo, hi;
-    *i ^= DEFAULT_SECRET[2];
-    *j ^= DEFAULT_SECRET[3];
+    *i ^= CONSTANT[2];
+    *j ^= CONSTANT[3];
     MathMult::mult64_128(lo, hi, *i, *j);
-    *i ^= lo ^ DEFAULT_SECRET[4];
-    *j ^= hi ^ DEFAULT_SECRET[5];
+    *i ^= lo ^ CONSTANT[4];
+    *j ^= hi ^ CONSTANT[5];
     MathMult::mult64_128(lo, hi, *i, *j);
     *i ^= *j ^ lo ^ hi;
 }
-template <bool blindfast>
+
+template <bool bfast>
 static FORCE_INLINE void epi_short_128(uint64_t* i, uint64_t* j) {
     uint64_t lo0, lo1;
     uint64_t hi0, hi1;
-    if (!blindfast) {
-        MathMult::mult64_128(lo0, hi0, *i ^ DEFAULT_SECRET[2], *j);
-        MathMult::mult64_128(lo1, hi1, *i, *j ^ DEFAULT_SECRET[3]);
+    if (!bfast) {
+        MathMult::mult64_128(lo0, hi0, *i ^ CONSTANT[2], *j);
+        MathMult::mult64_128(lo1, hi1, *i, *j ^ CONSTANT[3]);
         *i ^= lo0 ^ hi1;
         *j ^= lo1 ^ hi0;
-        MathMult::mult64_128(lo0, hi0, *i ^ DEFAULT_SECRET[4], *j);
-        MathMult::mult64_128(lo1, hi1, *i, *j ^ DEFAULT_SECRET[5]);
+        MathMult::mult64_128(lo0, hi0, *i ^ CONSTANT[4], *j);
+        MathMult::mult64_128(lo1, hi1, *i, *j ^ CONSTANT[5]);
         *i ^= lo0 ^ hi1;
         *j ^= lo1 ^ hi0;
     } else {
         MathMult::mult64_128(lo0, hi0, *i, *j);
-        MathMult::mult64_128(lo1, hi1, *i ^ DEFAULT_SECRET[2], *j ^ DEFAULT_SECRET[3]);
+        MathMult::mult64_128(lo1, hi1, *i ^ CONSTANT[2], *j ^ CONSTANT[3]);
         *i = lo0 ^ hi1;
         *j = lo1 ^ hi0;
         MathMult::mult64_128(lo0, hi0, *i, *j);
-        MathMult::mult64_128(lo1, hi1, *i ^ DEFAULT_SECRET[4], *j ^ DEFAULT_SECRET[5]);
+        MathMult::mult64_128(lo1, hi1, *i ^ CONSTANT[4], *j ^ CONSTANT[5]);
         *i = lo0 ^ hi1;
         *j = lo1 ^ hi0;
     }
 }
 
-template <bool blindfast>
+template <bool bfast>
 static FORCE_INLINE void epi_loong(uint64_t* i, uint64_t* j, uint64_t* k) {
     uint64_t lo0, lo1, lo2;
     uint64_t hi0, hi1, hi2;
-    if (!blindfast) {
-        MathMult::mult64_128(lo0, hi0, *i ^ DEFAULT_SECRET[0], *j);
-        MathMult::mult64_128(lo1, hi1, *j ^ DEFAULT_SECRET[1], *k);
-        MathMult::mult64_128(lo2, hi2, *k ^ DEFAULT_SECRET[2], *i);
+    if (!bfast) {
+        MathMult::mult64_128(lo0, hi0, *i ^ CONSTANT[0], *j);
+        MathMult::mult64_128(lo1, hi1, *j ^ CONSTANT[1], *k);
+        MathMult::mult64_128(lo2, hi2, *k ^ CONSTANT[2], *i);
         *i ^= lo0 ^ hi2;
         *j ^= lo1 ^ hi0;
         *k ^= lo2 ^ hi1;
@@ -367,16 +373,18 @@ static FORCE_INLINE void epi_loong(uint64_t* i, uint64_t* j, uint64_t* k) {
         *j = lo1 ^ hi0;
         *k = lo2 ^ hi1;
     }
+
     *i += *j + *k;
 }
-template <bool blindfast>
+
+template <bool bfast>
 static FORCE_INLINE void epi_loong_128(uint64_t* i, uint64_t* j, uint64_t* k) {
     uint64_t lo0, lo1, lo2;
     uint64_t hi0, hi1, hi2;
-    if (!blindfast) {
-        MathMult::mult64_128(lo0, hi0, *i ^ DEFAULT_SECRET[0], *j);
-        MathMult::mult64_128(lo1, hi1, *j ^ DEFAULT_SECRET[1], *k);
-        MathMult::mult64_128(lo2, hi2, *k ^ DEFAULT_SECRET[2], *i);
+    if (!bfast) {
+        MathMult::mult64_128(lo0, hi0, *i ^ CONSTANT[0], *j);
+        MathMult::mult64_128(lo1, hi1, *j ^ CONSTANT[1], *k);
+        MathMult::mult64_128(lo2, hi2, *k ^ CONSTANT[2], *i);
         *i ^= lo0 ^ lo1 ^ hi2;  // `k` already mixed in via `_chixx`.
         *j ^= hi0 ^ hi1 ^ lo2;
     } else {
@@ -388,32 +396,36 @@ static FORCE_INLINE void epi_loong_128(uint64_t* i, uint64_t* j, uint64_t* k) {
     }
 }
 
-template <bool bswap, bool blindfast>
+template <bool bswap, bool bfast>
 static inline void hash(const void* bytes, const size_t len, const seed_t seed, void* out) {
     uint64_t i, j, k;
+
     if (likely(len <= 32)) {
         tower_short<bswap>((const uint8_t*)bytes, len, seed, &i, &j);
         epi_short(&i, &j);
     } else {
-        tower_loong<bswap, blindfast>((const uint8_t*)bytes, len, seed, &i, &j, &k);
-        epi_loong<blindfast>(&i, &j, &k);
+        tower_loong<bswap, bfast>((const uint8_t*)bytes, len, seed, &i, &j, &k);
+        epi_loong<bfast>(&i, &j, &k);
     }
+
     if (isLE()) {
         PUT_U64<false>(i, (uint8_t*)out, 0);
     } else {
         PUT_U64<true>(i, (uint8_t*)out, 0);
     }
 }
-template <bool bswap, bool blindfast>
+template <bool bswap, bool bfast>
 static inline void hash_128(const void* bytes, const size_t len, const seed_t seed, void* out) {
     uint64_t i, j, k;
+
     if (likely(len <= 32)) {
         tower_short<bswap>((const uint8_t*)bytes, len, seed, &i, &j);
-        epi_short_128<blindfast>(&i, &j);
+        epi_short_128<bfast>(&i, &j);
     } else {
-        tower_loong<bswap, blindfast>((const uint8_t*)bytes, len, seed, &i, &j, &k);
-        epi_loong_128<blindfast>(&i, &j, &k);
+        tower_loong<bswap, bfast>((const uint8_t*)bytes, len, seed, &i, &j, &k);
+        epi_loong_128<bfast>(&i, &j, &k);
     }
+
     if (isLE()) {
         PUT_U64<false>(i, (uint8_t*)out, 0);
         PUT_U64<false>(j, (uint8_t*)out, 8);
@@ -487,3 +499,5 @@ REGISTER_HASH(
     $.hashfn_native   = hash_128<false, true>,
     $.hashfn_bswap    = hash_128<true, true>
 );
+
+// Maintaining `verification_LE` annoys me. Leave it until v0.3 is ready.

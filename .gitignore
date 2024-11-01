@@ -1,2 +1,5 @@
 /target
 /smhasher*
+
+# ignore temporary files.
+/_*
