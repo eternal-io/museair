@@ -40,7 +40,7 @@
 
 #include "Mathmult.h"
 
-#define HASH_ALGORITHM_VERSION "0.3-rc3"
+#define HASH_ALGORITHM_VERSION "0.3-rc4"
 
 #define u64x(N) N * 8
 
@@ -80,14 +80,13 @@ static FORCE_INLINE void read_short(const uint8_t* bytes, const size_t len, uint
     }
 }
 
-/// Keccak χ step.
-static FORCE_INLINE void _chixx(uint64_t* t, uint64_t* u, uint64_t* v) {
-    uint64_t x = ~*u & *v;
-    uint64_t y = ~*v & *t;
-    uint64_t z = ~*t & *u;
-    *t ^= x;
-    *u ^= y;
-    *v ^= z;
+static FORCE_INLINE void _mumix(uint64_t* state_p, uint64_t* state_q, uint64_t input_p, uint64_t input_q) {
+    uint64_t lo, hi;
+    *state_p ^= input_p;
+    *state_q ^= input_q;
+    MathMult::mult64_128(lo, hi, *state_p, *state_q);
+    *state_p ^= lo;
+    *state_q ^= hi;
 }
 
 // --------------------------------------------------------------------------------
@@ -186,7 +185,6 @@ static FORCE_INLINE void hash_short(const uint8_t* bytes,
     }
 }
 
-// TODO: reduce function size, it is too large to be fast.
 template <bool bswap, bool bfast, bool b128>
 static NEVER_INLINE void hash_loong(const uint8_t* bytes,
                                     const size_t len,
@@ -272,105 +270,33 @@ static NEVER_INLINE void hash_loong(const uint8_t* bytes,
             q -= u64x(12);
 
         } while (likely(q >= u64x(12)));
+
+        state[0] ^= lo5;
     }
 
-    if (unlikely(q >= u64x(8))) {
-        if (!bfast) {
-            state[0] ^= read_u64<bswap>(p + u64x(0));
-            state[1] ^= read_u64<bswap>(p + u64x(1));
-            MathMult::mult64_128(lo0, hi0, state[0], state[1]);
-            state[0] += lo5 ^ hi0;
+    /* 交换下方`state[]`的使用顺序会明显影响性能表现，现在这样似乎是最好的组合。
+       还没有检查过它们生成的汇编，有可能是编译器“太过聪明”以至于产生了一些负优化。就像之前的`state[N] += lo[N-1] ^ hi[N]`那样，加法不能用异或替代。 */
 
-            state[1] ^= read_u64<bswap>(p + u64x(2));
-            state[2] ^= read_u64<bswap>(p + u64x(3));
-            MathMult::mult64_128(lo1, hi1, state[1], state[2]);
-            state[1] += lo0 ^ hi1;
-        } else {
-            state[0] ^= read_u64<bswap>(p + u64x(0));
-            state[1] ^= read_u64<bswap>(p + u64x(1));
-            MathMult::mult64_128(lo0, hi0, state[0], state[1]);
-            state[0] = lo5 ^ hi0;
+    if (unlikely(q >= u64x(6))) {
+        _mumix(&state[0], &state[1], read_u64<bswap>(p + u64x(0)), read_u64<bswap>(p + u64x(1)));
+        _mumix(&state[2], &state[3], read_u64<bswap>(p + u64x(2)), read_u64<bswap>(p + u64x(3)));
+        _mumix(&state[4], &state[5], read_u64<bswap>(p + u64x(4)), read_u64<bswap>(p + u64x(5)));
 
-            state[1] ^= read_u64<bswap>(p + u64x(2));
-            state[2] ^= read_u64<bswap>(p + u64x(3));
-            MathMult::mult64_128(lo1, hi1, state[1], state[2]);
-            state[1] = lo0 ^ hi1;
-        }
-
-        lo5 = lo1;
-
-        p += u64x(4);
-        q -= u64x(4);
-    }
-
-    if (likely(q >= u64x(4))) {
-        if (!bfast) {
-            state[2] ^= read_u64<bswap>(p + u64x(0));
-            state[3] ^= read_u64<bswap>(p + u64x(1));
-            MathMult::mult64_128(lo2, hi2, state[2], state[3]);
-            state[2] += lo5 ^ hi2;
-
-            state[3] ^= read_u64<bswap>(p + u64x(2));
-            state[4] ^= read_u64<bswap>(p + u64x(3));
-            MathMult::mult64_128(lo3, hi3, state[3], state[4]);
-            state[3] += lo2 ^ hi3;
-        } else {
-            state[2] ^= read_u64<bswap>(p + u64x(0));
-            state[3] ^= read_u64<bswap>(p + u64x(1));
-            MathMult::mult64_128(lo2, hi2, state[2], state[3]);
-            state[2] = lo5 ^ hi2;
-
-            state[3] ^= read_u64<bswap>(p + u64x(2));
-            state[4] ^= read_u64<bswap>(p + u64x(3));
-            MathMult::mult64_128(lo3, hi3, state[3], state[4]);
-            state[3] = lo2 ^ hi3;
-        }
-
-        lo5 = lo3;
-
-        p += u64x(4);
-        q -= u64x(4);
+        p += u64x(6);
+        q -= u64x(6);
     }
 
     if (likely(q >= u64x(2))) {
-        if (!bfast) {
-            state[4] ^= read_u64<bswap>(p + u64x(0));
-            state[5] ^= read_u64<bswap>(p + u64x(1));
-            MathMult::mult64_128(lo4, hi4, state[4], state[5]);
-            state[4] += lo5 ^ hi4;
-        } else {
-            state[4] ^= read_u64<bswap>(p + u64x(0));
-            state[5] ^= read_u64<bswap>(p + u64x(1));
-            MathMult::mult64_128(lo4, hi4, state[4], state[5]);
-            state[4] = lo5 ^ hi4;
+        _mumix(&state[0], &state[3], read_u64<bswap>(p + u64x(0)), read_u64<bswap>(p + u64x(1)));
+        if (likely(q >= u64x(4))) {
+            _mumix(&state[1], &state[4], read_u64<bswap>(p + u64x(2)), read_u64<bswap>(p + u64x(3)));
         }
-
-        lo5 = lo4;
-
-        p += u64x(2);
-        q -= u64x(2);
     }
 
-    if (true) {
-        read_short<bswap>(p, q, &i, &j);
+    _mumix(&state[2], &state[5], read_u64<bswap>(p + q - u64x(2)), read_u64<bswap>(p + q - u64x(1)));
 
-        if (!bfast) {
-            state[5] ^= i;
-            state[0] ^= j;
-            MathMult::mult64_128(lo0, hi5, state[5], state[0]);
-            state[5] += lo5 ^ hi5;
-        } else {
-            state[5] ^= i;
-            state[0] ^= j;
-            MathMult::mult64_128(lo0, hi5, state[5], state[0]);
-            state[5] = lo5 ^ hi5;
-        }
+    /*-------- epilogue --------*/
 
-        state[0] ^= lo0;
-    }
-
-    _chixx(&state[0], &state[2], &state[4]);
-    _chixx(&state[1], &state[3], &state[5]);
     i = state[0] + state[1];
     j = state[2] + state[3];
     k = state[4] + state[5];
@@ -477,7 +403,7 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 64,
-    $.verification_LE = 0x0,
+    $.verification_LE = 0x23E98FFC,
     $.hashfn_native   = hash<false, true, false>,
     $.hashfn_bswap    = hash<true, true, false>
 );
