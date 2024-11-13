@@ -40,7 +40,7 @@
 
 #include "Mathmult.h"
 
-#define HASH_ALGORITHM_VERSION "0.3-rc4"
+#define HASH_ALGORITHM_VERSION "0.3-rc5"
 
 #define u64x(N) N * 8
 
@@ -51,7 +51,7 @@ static const uint64_t CONSTANT[7] = {
     UINT64_C(0x33ea8f71bb6016d8),
 };
 
-// --------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 template <bool bswap>
 static FORCE_INLINE uint64_t read_u64(const uint8_t* p) {
@@ -89,9 +89,9 @@ static FORCE_INLINE void _mumix(uint64_t* state_p, uint64_t* state_q, uint64_t i
     *state_q ^= hi;
 }
 
-// --------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
-template <bool bswap, bool bfast, bool b128>
+template <bool bswap, bool b128>
 static FORCE_INLINE void hash_short(const uint8_t* bytes, const size_t len, const seed_t seed, uint64_t*, uint64_t*);
 
 template <bool bswap, bool bfast, bool b128>
@@ -102,7 +102,7 @@ static inline void hash(const void* bytes, const size_t len, const seed_t seed, 
     uint64_t out_lo, out_hi;
 
     if (likely(len <= u64x(4))) {
-        hash_short<bswap, bfast, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
+        hash_short<bswap, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
     } else {
         hash_loong<bswap, bfast, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
     }
@@ -124,7 +124,7 @@ static inline void hash(const void* bytes, const size_t len, const seed_t seed, 
     }
 }
 
-template <bool bswap, bool bfast, bool b128>
+template <bool bswap, bool b128>
 static FORCE_INLINE void hash_short(const uint8_t* bytes,
                                     const size_t len,
                                     const seed_t seed,
@@ -133,7 +133,7 @@ static FORCE_INLINE void hash_short(const uint8_t* bytes,
     uint64_t lo0, lo1, lo2;
     uint64_t hi0, hi1, hi2;
 
-    uint64_t i, j;  // TODO: i=seed, j=len ?
+    uint64_t i, j;
 
     MathMult::mult64_128(lo2, hi2, seed ^ CONSTANT[0], len ^ CONSTANT[1]);
 
@@ -143,36 +143,24 @@ static FORCE_INLINE void hash_short(const uint8_t* bytes,
     j ^= seed ^ hi2;
 
     if (unlikely(len >= u64x(2))) {
-        uint64_t k, w;
-        read_short<bswap>(bytes + u64x(2), len - u64x(2), &k, &w);
-        MathMult::mult64_128(lo0, hi0, CONSTANT[2], CONSTANT[3] ^ k);
-        MathMult::mult64_128(lo1, hi1, CONSTANT[4], CONSTANT[5] ^ w);
+        uint64_t u, v;
+        read_short<bswap>(bytes + u64x(2), len - u64x(2), &u, &v);
+        MathMult::mult64_128(lo0, hi0, CONSTANT[2], CONSTANT[3] ^ u);
+        MathMult::mult64_128(lo1, hi1, CONSTANT[4], CONSTANT[5] ^ v);
         i ^= lo0 ^ hi1;
         j ^= lo1 ^ hi0;
     }
 
     if (b128) {
-        if (!bfast) {
-            MathMult::mult64_128(lo0, hi0, i ^ CONSTANT[2], j);
-            MathMult::mult64_128(lo1, hi1, i, j ^ CONSTANT[3]);
-            i ^= lo0 ^ hi1;
-            j ^= lo1 ^ hi0;
-            MathMult::mult64_128(lo0, hi0, i ^ CONSTANT[4], j);
-            MathMult::mult64_128(lo1, hi1, i, j ^ CONSTANT[5]);
+        MathMult::mult64_128(lo0, hi0, i, j);
+        MathMult::mult64_128(lo1, hi1, i ^ CONSTANT[2], j ^ CONSTANT[3]);
+        i = lo0 ^ hi1;
+        j = lo1 ^ hi0;
+        MathMult::mult64_128(lo0, hi0, i, j);
+        MathMult::mult64_128(lo1, hi1, i ^ CONSTANT[4], j ^ CONSTANT[5]);
 
-            *out_lo = i ^ lo0 ^ hi1;
-            *out_hi = j ^ lo1 ^ hi0;
-        } else {
-            MathMult::mult64_128(lo0, hi0, i, j);
-            MathMult::mult64_128(lo1, hi1, i ^ CONSTANT[2], j ^ CONSTANT[3]);
-            i = lo0 ^ hi1;
-            j = lo1 ^ hi0;
-            MathMult::mult64_128(lo0, hi0, i, j);
-            MathMult::mult64_128(lo1, hi1, i ^ CONSTANT[4], j ^ CONSTANT[5]);
-
-            *out_lo = lo0 ^ hi1;
-            *out_hi = lo1 ^ hi0;
-        }
+        *out_lo = lo0 ^ hi1;
+        *out_hi = lo1 ^ hi0;
     } else {
         i ^= CONSTANT[2];
         j ^= CONSTANT[3];
@@ -199,7 +187,7 @@ static NEVER_INLINE void hash_loong(const uint8_t* bytes,
     uint64_t lo0, lo1, lo2, lo3, lo4, lo5 = CONSTANT[6];
     uint64_t hi0, hi1, hi2, hi3, hi4, hi5;
 
-    uint64_t state[6] = {CONSTANT[0] + seed, CONSTANT[1] - seed, CONSTANT[2] ^ seed,  //
+    uint64_t state[6] = {CONSTANT[0] + seed, CONSTANT[1] - seed, CONSTANT[2] ^ seed,
                          CONSTANT[3] + seed, CONSTANT[4] - seed, CONSTANT[5] ^ seed};
 
     if (unlikely(q >= u64x(12))) {
@@ -306,61 +294,37 @@ static NEVER_INLINE void hash_loong(const uint8_t* bytes,
     j = ROTR64(j, rot);
     k ^= len;
 
-    if (!bfast) {
-        MathMult::mult64_128(lo0, hi0, i ^ CONSTANT[3], j);
-        MathMult::mult64_128(lo1, hi1, j ^ CONSTANT[4], k);
-        MathMult::mult64_128(lo2, hi2, k ^ CONSTANT[5], i);
+    MathMult::mult64_128(lo0, hi0, i, j);
+    MathMult::mult64_128(lo1, hi1, j, k);
+    MathMult::mult64_128(lo2, hi2, k, i);
+    i = lo0 ^ hi2;
+    j = lo1 ^ hi0;
+    k = lo2 ^ hi1;
 
-        i ^= lo0 ^ hi2;
-        j ^= lo1 ^ hi0;
-        k ^= lo2 ^ hi1;
-
+    if (b128) {
+        MathMult::mult64_128(lo0, hi0, i, j);
+        MathMult::mult64_128(lo1, hi1, j, k);
+        MathMult::mult64_128(lo2, hi2, k, i);
+        *out_lo = lo0 ^ lo1 ^ hi2;
+        *out_hi = hi0 ^ hi1 ^ lo2;
     } else {
         MathMult::mult64_128(lo0, hi0, i, j);
         MathMult::mult64_128(lo1, hi1, j, k);
         MathMult::mult64_128(lo2, hi2, k, i);
 
-        i = lo0 ^ hi2;
-        j = lo1 ^ hi0;
-        k = lo2 ^ hi1;
-    }
-
-    if (b128) {
+        /* Observed that this branch cannot be simplified,
+            otherwise `-BFast` will be strangely slower than `-BFast-128` 😑 */
+        /* This may related to template specialization? Haven't check its assembly yet.
+            If there is no such problem in Rust, I will remove this branch. */
         if (!bfast) {
-            MathMult::mult64_128(lo0, hi0, i ^ CONSTANT[0], j);
-            MathMult::mult64_128(lo1, hi1, j ^ CONSTANT[1], k);
-            MathMult::mult64_128(lo2, hi2, k ^ CONSTANT[2], i);
-
-            *out_lo = i ^ lo0 ^ lo1 ^ hi2;
-            *out_hi = j ^ hi0 ^ hi1 ^ lo2;
-
+            *out_lo = (k ^ hi0 ^ lo1) + (i ^ hi1 ^ lo2) + (j ^ hi2 ^ lo0);
         } else {
-            MathMult::mult64_128(lo0, hi0, i, j);
-            MathMult::mult64_128(lo1, hi1, j, k);
-            MathMult::mult64_128(lo2, hi2, k, i);
-
-            *out_lo = lo0 ^ lo1 ^ hi2;
-            *out_hi = hi0 ^ hi1 ^ lo2;
-        }
-    } else {
-        if (!bfast) {
-            MathMult::mult64_128(lo0, hi0, i ^ CONSTANT[0], j);
-            MathMult::mult64_128(lo1, hi1, j ^ CONSTANT[1], k);
-            MathMult::mult64_128(lo2, hi2, k ^ CONSTANT[2], i);
-
-            *out_lo = (i ^ lo0 ^ hi2) + (j ^ lo1 ^ hi0) + (k ^ lo2 ^ hi1);
-
-        } else {
-            MathMult::mult64_128(lo0, hi0, i, j);
-            MathMult::mult64_128(lo1, hi1, j, k);
-            MathMult::mult64_128(lo2, hi2, k, i);
-
             *out_lo = (lo0 ^ hi2) + (lo1 ^ hi0) + (lo2 ^ hi1);
         }
     }
 }
 
-// --------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // clang-format off
 REGISTER_FAMILY(MuseAir,
     $.src_url    = "https://github.com/eternal-io/museair",
@@ -376,7 +340,7 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 64,
-    $.verification_LE = 0x0,
+    $.verification_LE = 0xF154752B,
     $.hashfn_native   = hash<false, false, false>,
     $.hashfn_bswap    = hash<true, false, false>
 );
@@ -389,7 +353,7 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 128,
-    $.verification_LE = 0x0,
+    $.verification_LE = 0x158D5E9B,
     $.hashfn_native   = hash<false, false, true>,
     $.hashfn_bswap    = hash<true, false, true>
 );
@@ -416,7 +380,7 @@ REGISTER_HASH(
                  | FLAG_IMPL_LICENSE_MIT
                  | FLAG_IMPL_LICENSE_APACHE2,
     $.bits = 128,
-    $.verification_LE = 0x0,
+    $.verification_LE = 0x3032E8B3,
     $.hashfn_native   = hash<false, true, true>,
     $.hashfn_bswap    = hash<true, true, true>
 );
