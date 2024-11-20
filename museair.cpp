@@ -40,7 +40,7 @@
 
 #include "Mathmult.h"
 
-#define HASH_ALGORITHM_VERSION "0.3-rc5"
+#define ALGORITHM_VERSION "0.3-rc6"
 
 #define u64x(N) N * 8
 
@@ -91,7 +91,7 @@ static FORCE_INLINE void _mumix(uint64_t* state_p, uint64_t* state_q, uint64_t i
 
 //------------------------------------------------------------------------------
 
-template <bool bswap, bool b128>
+template <bool bswap, bool bfast, bool b128>
 static FORCE_INLINE void hash_short(const uint8_t* bytes, const size_t len, const seed_t seed, uint64_t*, uint64_t*);
 
 template <bool bswap, bool bfast, bool b128>
@@ -102,7 +102,7 @@ static inline void hash(const void* bytes, const size_t len, const seed_t seed, 
     uint64_t out_lo, out_hi;
 
     if (likely(len <= u64x(4))) {
-        hash_short<bswap, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
+        hash_short<bswap, bfast, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
     } else {
         hash_loong<bswap, bfast, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
     }
@@ -124,7 +124,7 @@ static inline void hash(const void* bytes, const size_t len, const seed_t seed, 
     }
 }
 
-template <bool bswap, bool b128>
+template <bool bswap, bool bfast, bool b128>
 static FORCE_INLINE void hash_short(const uint8_t* bytes,
                                     const size_t len,
                                     const seed_t seed,
@@ -142,7 +142,7 @@ static FORCE_INLINE void hash_short(const uint8_t* bytes,
     i ^= len ^ lo2;
     j ^= seed ^ hi2;
 
-    if (unlikely(len >= u64x(2))) {
+    if (unlikely(len > u64x(2))) {
         uint64_t u, v;
         read_short<bswap>(bytes + u64x(2), len - u64x(2), &u, &v);
         MathMult::mult64_128(lo0, hi0, CONSTANT[2], CONSTANT[3] ^ u);
@@ -164,12 +164,24 @@ static FORCE_INLINE void hash_short(const uint8_t* bytes,
     } else {
         i ^= CONSTANT[2];
         j ^= CONSTANT[3];
-        MathMult::mult64_128(lo0, hi0, i, j);
-        i ^= lo0 ^ CONSTANT[4];
-        j ^= hi0 ^ CONSTANT[5];
+
         MathMult::mult64_128(lo0, hi0, i, j);
 
-        *out_lo = i ^ j ^ lo0 ^ hi0;
+        if (!bfast) {
+            i ^= lo0 ^ CONSTANT[4];
+            j ^= hi0 ^ CONSTANT[5];
+        } else {
+            i = lo0 ^ CONSTANT[4];
+            j = hi0 ^ CONSTANT[5];
+        }
+
+        MathMult::mult64_128(lo0, hi0, i, j);
+
+        if (!bfast) {
+            *out_lo = i ^ j ^ lo0 ^ hi0;
+        } else {
+            *out_lo = lo0 ^ hi0;
+        }
     }
 }
 
@@ -311,16 +323,7 @@ static NEVER_INLINE void hash_loong(const uint8_t* bytes,
         MathMult::mult64_128(lo0, hi0, i, j);
         MathMult::mult64_128(lo1, hi1, j, k);
         MathMult::mult64_128(lo2, hi2, k, i);
-
-        /* Observed that this branch cannot be simplified,
-            otherwise `-BFast` will be strangely slower than `-BFast-128` 😑 */
-        /* This may related to template specialization? Haven't check its assembly yet.
-            If there is no such problem in Rust, I will remove this branch. */
-        if (!bfast) {
-            *out_lo = (k ^ hi0 ^ lo1) + (i ^ hi1 ^ lo2) + (j ^ hi2 ^ lo0);
-        } else {
-            *out_lo = (lo0 ^ hi2) + (lo1 ^ hi0) + (lo2 ^ hi1);
-        }
+        *out_lo = (lo0 ^ hi2) + (lo1 ^ hi0) + (lo2 ^ hi1);
     }
 }
 
@@ -333,56 +336,54 @@ REGISTER_FAMILY(MuseAir,
 
 REGISTER_HASH(
     MuseAir,
-    $.desc       = "MuseAir hash v" HASH_ALGORITHM_VERSION " @ 64-bit output",
+    $.desc       = "MuseAir hash v" ALGORITHM_VERSION " @ 64-bit output",
     $.hash_flags = 0,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
-                 | FLAG_IMPL_LICENSE_MIT
-                 | FLAG_IMPL_LICENSE_APACHE2,
+                 | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0xF154752B,
+    $.verification_LE = 0x4F7AF44C,
+    $.verification_BE = 0x7CB9CFCD,
     $.hashfn_native   = hash<false, false, false>,
     $.hashfn_bswap    = hash<true, false, false>
 );
 REGISTER_HASH(
     MuseAir_128,
-    $.desc       = "MuseAir hash v" HASH_ALGORITHM_VERSION " @ 128-bit output",
+    $.desc       = "MuseAir hash v" ALGORITHM_VERSION " @ 128-bit output",
     $.hash_flags = 0,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
-                 | FLAG_IMPL_LICENSE_MIT
-                 | FLAG_IMPL_LICENSE_APACHE2,
+                 | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x158D5E9B,
+    $.verification_LE = 0xEFACD140,
+    $.verification_BE = 0xF7DE649D,
     $.hashfn_native   = hash<false, false, true>,
     $.hashfn_bswap    = hash<true, false, true>
 );
 
 REGISTER_HASH(
     MuseAir_BFast,
-    $.desc       = "MuseAir hash BFast variant v" HASH_ALGORITHM_VERSION " @ 64-bit output",
+    $.desc       = "MuseAir hash BFast variant v" ALGORITHM_VERSION " @ 64-bit output",
     $.hash_flags = 0,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
-                 | FLAG_IMPL_LICENSE_MIT
-                 | FLAG_IMPL_LICENSE_APACHE2,
+                 | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x23E98FFC,
+    $.verification_LE = 0x4E8C0789,
+    $.verification_BE = 0xAAF61B77,
     $.hashfn_native   = hash<false, true, false>,
     $.hashfn_bswap    = hash<true, true, false>
 );
 REGISTER_HASH(
     MuseAir_BFast_128,
-    $.desc       = "MuseAir hash BFast variant v" HASH_ALGORITHM_VERSION " @ 128-bit output",
+    $.desc       = "MuseAir hash BFast variant v" ALGORITHM_VERSION " @ 128-bit output",
     $.hash_flags = 0,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
-                 | FLAG_IMPL_LICENSE_MIT
-                 | FLAG_IMPL_LICENSE_APACHE2,
+                 | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x3032E8B3,
+    $.verification_LE = 0x7CCE23A2,
+    $.verification_BE = 0x102D89CC,
     $.hashfn_native   = hash<false, true, true>,
     $.hashfn_bswap    = hash<true, true, true>
 );
-
-// Maintaining verification value annoys me. Leave it until v0.3 is ready.

@@ -1,11 +1,11 @@
 [package]
 name = "museair"
-version = "0.2.0"
+version = "0.3.0-rc6"
 edition = "2021"
 authors = ["K--Aethiax"]
 publish = true
 
-description = "New fastest portable hash: immune to blinding multiplication, even faster then wyhash, SMHasher3 passed."
+description = "Blazingly™ fast portable hash function designed by K--Aethiax."
 
 documentation = "https://docs.rs/museair"
 repository = "https://github.com/eternal-io/museair"
@@ -22,9 +22,10 @@ exclude = ["smhasher*", "results/*", "*.cpp", "*.md", "!CRATES.IO-README.md"]
 
 
 [dev-dependencies]
+hashverify = "0.1.0"
 criterion = "0.5.1"
 komihash = "0.4.1"
-wyhash-final4 = "0.1.3"
+wyhash-final4 = "0.2.1"
 wyhash = "0.5.0"
 
 
