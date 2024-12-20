@@ -40,7 +40,7 @@
 
 #include "Mathmult.h"
 
-#define ALGORITHM_VERSION "0.3-rc6"
+#define ALGORITHM_VERSION "0.3"
 
 #define u64x(N) N * 8
 
@@ -80,13 +80,18 @@ static FORCE_INLINE void read_short(const uint8_t* bytes, const size_t len, uint
     }
 }
 
+template <bool bfast>
 static FORCE_INLINE void _mumix(uint64_t* state_p, uint64_t* state_q, uint64_t input_p, uint64_t input_q) {
-    uint64_t lo, hi;
-    *state_p ^= input_p;
-    *state_q ^= input_q;
-    MathMult::mult64_128(lo, hi, *state_p, *state_q);
-    *state_p ^= lo;
-    *state_q ^= hi;
+    if (!bfast) {
+        uint64_t lo, hi;
+        *state_p ^= input_p;
+        *state_q ^= input_q;
+        MathMult::mult64_128(lo, hi, *state_p, *state_q);
+        *state_p ^= lo;
+        *state_q ^= hi;
+    } else {
+        MathMult::mult64_128(*state_p, *state_q, *state_p ^ input_p, *state_q ^ input_q);
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -133,11 +138,9 @@ static FORCE_INLINE void hash_short(const uint8_t* bytes,
     uint64_t lo0, lo1, lo2;
     uint64_t hi0, hi1, hi2;
 
-    uint64_t i, j;
-
     MathMult::mult64_128(lo2, hi2, seed ^ CONSTANT[0], len ^ CONSTANT[1]);
 
-    // Seems compilers are smart enough to make `min(len, 16)` branchless.
+    uint64_t i, j;
     read_short<bswap>(bytes, len <= 16 ? len : 16, &i, &j);
     i ^= len ^ lo2;
     j ^= seed ^ hi2;
@@ -158,29 +161,22 @@ static FORCE_INLINE void hash_short(const uint8_t* bytes,
         j = lo1 ^ hi0;
         MathMult::mult64_128(lo0, hi0, i, j);
         MathMult::mult64_128(lo1, hi1, i ^ CONSTANT[4], j ^ CONSTANT[5]);
-
         *out_lo = lo0 ^ hi1;
         *out_hi = lo1 ^ hi0;
     } else {
-        i ^= CONSTANT[2];
-        j ^= CONSTANT[3];
-
-        MathMult::mult64_128(lo0, hi0, i, j);
-
+        MathMult::mult64_128(lo2, hi2, i ^ CONSTANT[2], j ^ CONSTANT[3]);
         if (!bfast) {
-            i ^= lo0 ^ CONSTANT[4];
-            j ^= hi0 ^ CONSTANT[5];
+            i ^= lo2;
+            j ^= hi2;
         } else {
-            i = lo0 ^ CONSTANT[4];
-            j = hi0 ^ CONSTANT[5];
+            i = lo2;
+            j = hi2;
         }
-
-        MathMult::mult64_128(lo0, hi0, i, j);
-
+        MathMult::mult64_128(lo2, hi2, i ^ CONSTANT[4], j ^ CONSTANT[5]);
         if (!bfast) {
-            *out_lo = i ^ j ^ lo0 ^ hi0;
+            *out_lo = i ^ j ^ lo2 ^ hi2;
         } else {
-            *out_lo = lo0 ^ hi0;
+            *out_lo = lo2 ^ hi2;
         }
     }
 }
@@ -274,32 +270,29 @@ static NEVER_INLINE void hash_loong(const uint8_t* bytes,
         state[0] ^= lo5;
     }
 
-    /* 交换下方`state[]`的使用顺序会明显影响性能表现，现在这样似乎是最好的组合。
-       还没有检查过它们生成的汇编，有可能是编译器“太过聪明”以至于产生了一些负优化。就像之前的`state[N] += lo[N-1] ^ hi[N]`那样，加法不能用异或替代。 */
-
     if (unlikely(q >= u64x(6))) {
-        _mumix(&state[0], &state[1], read_u64<bswap>(p + u64x(0)), read_u64<bswap>(p + u64x(1)));
-        _mumix(&state[2], &state[3], read_u64<bswap>(p + u64x(2)), read_u64<bswap>(p + u64x(3)));
-        _mumix(&state[4], &state[5], read_u64<bswap>(p + u64x(4)), read_u64<bswap>(p + u64x(5)));
+        _mumix<bfast>(&state[0], &state[1], read_u64<bswap>(p + u64x(0)), read_u64<bswap>(p + u64x(1)));
+        _mumix<bfast>(&state[2], &state[3], read_u64<bswap>(p + u64x(2)), read_u64<bswap>(p + u64x(3)));
+        _mumix<bfast>(&state[4], &state[5], read_u64<bswap>(p + u64x(4)), read_u64<bswap>(p + u64x(5)));
 
         p += u64x(6);
         q -= u64x(6);
     }
 
     if (likely(q >= u64x(2))) {
-        _mumix(&state[0], &state[3], read_u64<bswap>(p + u64x(0)), read_u64<bswap>(p + u64x(1)));
+        _mumix<bfast>(&state[0], &state[3], read_u64<bswap>(p + u64x(0)), read_u64<bswap>(p + u64x(1)));
         if (likely(q >= u64x(4))) {
-            _mumix(&state[1], &state[4], read_u64<bswap>(p + u64x(2)), read_u64<bswap>(p + u64x(3)));
+            _mumix<bfast>(&state[1], &state[4], read_u64<bswap>(p + u64x(2)), read_u64<bswap>(p + u64x(3)));
         }
     }
 
-    _mumix(&state[2], &state[5], read_u64<bswap>(p + q - u64x(2)), read_u64<bswap>(p + q - u64x(1)));
+    _mumix<bfast>(&state[2], &state[5], read_u64<bswap>(p + q - u64x(2)), read_u64<bswap>(p + q - u64x(1)));
 
     /*-------- epilogue --------*/
 
-    i = state[0] + state[1];
-    j = state[2] + state[3];
-    k = state[4] + state[5];
+    i = state[0] - state[1];
+    j = state[2] - state[3];
+    k = state[4] - state[5];
 
     int rot = len & 63;
     i = ROTL64(i, rot);
@@ -342,8 +335,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x4F7AF44C,
-    $.verification_BE = 0x7CB9CFCD,
+    $.verification_LE = 0xF89F1683,
+    $.verification_BE = 0xDFEF2570,
     $.hashfn_native   = hash<false, false, false>,
     $.hashfn_bswap    = hash<true, false, false>
 );
@@ -355,8 +348,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0xEFACD140,
-    $.verification_BE = 0xF7DE649D,
+    $.verification_LE = 0xD3DFE238,
+    $.verification_BE = 0x05EC3BE4,
     $.hashfn_native   = hash<false, false, true>,
     $.hashfn_bswap    = hash<true, false, true>
 );
@@ -369,8 +362,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x4E8C0789,
-    $.verification_BE = 0xAAF61B77,
+    $.verification_LE = 0xC61BEE56,
+    $.verification_BE = 0x16186D00,
     $.hashfn_native   = hash<false, true, false>,
     $.hashfn_bswap    = hash<true, true, false>
 );
@@ -382,8 +375,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x7CCE23A2,
-    $.verification_BE = 0x102D89CC,
+    $.verification_LE = 0x27939BF1,
+    $.verification_BE = 0xCB4AB283,
     $.hashfn_native   = hash<false, true, true>,
     $.hashfn_bswap    = hash<true, true, true>
 );

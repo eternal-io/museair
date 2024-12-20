@@ -1,6 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use wyhash_final4::{generics::WyHashVariant, WyHash64, WyHash64Condom};
 
+#[rustfmt::skip]
 fn criterion_benchmark(c: &mut Criterion) {
     const SIZE: u64 = 256 * 1024;
     let msg = vec![0xABu8; SIZE as usize];
@@ -26,7 +27,8 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter(|| {
                 black_box(museair::bfast::hash_128(&msg, 42));
             })
-        });
+        })
+        ;
 
     c.benchmark_group("WyHash")
         .throughput(Throughput::Bytes(SIZE))
@@ -39,7 +41,8 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter(|| {
                 black_box(WyHash64Condom::with_seed(42).hash(&msg));
             })
-        });
+        })
+        ;
 
     c.benchmark_group("KomiHash")
         .throughput(Throughput::Bytes(SIZE))
@@ -47,7 +50,8 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter(|| {
                 black_box(komihash::komihash(&msg, 42));
             })
-        });
+        })
+        ;
 }
 
 criterion_group! {

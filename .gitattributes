@@ -1,1 +1,3 @@
-museair.cpp -linguist-detectable
+museair.cpp     -linguist-detectable
+results/**      -linguist-detectable
+results/*.log   -diff

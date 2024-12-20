@@ -1,11 +1,11 @@
 [package]
 name = "museair"
-version = "0.3.0-rc6"
+version = "0.3.0"
 edition = "2021"
 authors = ["K--Aethiax"]
 publish = true
 
-description = "Blazingly™ fast portable hash function designed by K--Aethiax."
+description = "Fast portable hash algorithm with highest bulk throughput and lowest small key latency (1-32 bytes) among portable hashes listed in SMHasher3, and made improvements for quality and usability."
 
 documentation = "https://docs.rs/museair"
 repository = "https://github.com/eternal-io/museair"
@@ -15,17 +15,21 @@ readme = "CRATES.IO-README.md"
 keywords = ["hash", "hasher", "museair"]
 categories = ["algorithms", "no-std"]
 
-exclude = ["smhasher*", "results/*", "*.cpp", "*.md", "!CRATES.IO-README.md"]
-
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+exclude = [
+    "smhasher*",
+    "results/*",
+    "*.png",
+    "*.cpp",
+    "*.md",
+    "!CRATES.IO-README.md",
+]
 
 
 [dev-dependencies]
 hashverify = "0.1.0"
 criterion = "0.5.1"
 komihash = "0.4.1"
-wyhash-final4 = "0.2.1"
+wyhash-final4 = "0.2.2"
 wyhash = "0.5.0"
 
 

@@ -255,7 +255,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "museair"
-version = "0.3.0-rc6"
+version = "0.3.0"
 dependencies = [
  "criterion",
  "hashverify",
@@ -637,6 +637,6 @@ dependencies = [
 
 [[package]]
 name = "wyhash-final4"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e4f724fd8118d0922c0ec9269aa80365aa79542096d8557b02ccb569d0a913e"
+checksum = "e19276aeff1b4987182db862cc0e75a79023528cd1ec951ea3bd6cddba029c7d"
