@@ -41,6 +41,7 @@ MuseAir **不是**为了密码学安全而设计的，你不应将其用于安�
 | MuseAir-128       |       128-bit |                   28.5 GiB/s |                       30.4 GiB/s |
 | MuseAir-BFast     |        64-bit |                   33.3 GiB/s |                       36.4 GiB/s |
 | MuseAir-BFast-128 |       128-bit |                   33.3 GiB/s |                       36.3 GiB/s |
+| rapidhash         |        64-bit |                   31.9 GiB/s |                       29.4 GiB/s |
 | wyhash 4.2        |        64-bit |                   31.9 GiB/s |                       28.4 GiB/s |
 | wyhash.condom 4.2 |        64-bit |                   25.3 GiB/s |                       22.8 GiB/s |
 | komihash 5.7      |        64-bit |                   25.5 GiB/s |                              N/A |

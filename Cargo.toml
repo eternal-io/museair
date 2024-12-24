@@ -15,14 +15,7 @@ readme = "CRATES.IO-README.md"
 keywords = ["hash", "hasher", "museair"]
 categories = ["algorithms", "no-std"]
 
-exclude = [
-    "smhasher*",
-    "results/*",
-    "*.png",
-    "*.cpp",
-    "*.md",
-    "!CRATES.IO-README.md",
-]
+include = ["src/**"]
 
 
 [dev-dependencies]
@@ -31,6 +24,7 @@ criterion = "0.5.1"
 komihash = "0.4.1"
 wyhash-final4 = "0.2.2"
 wyhash = "0.5.0"
+rapidhash = "1.2.0"
 
 
 [[bench]]

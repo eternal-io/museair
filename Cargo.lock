@@ -260,6 +260,7 @@ dependencies = [
  "criterion",
  "hashverify",
  "komihash",
+ "rapidhash",
  "wyhash",
  "wyhash-final4",
 ]
@@ -336,6 +337,12 @@ name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
+
+[[package]]
+name = "rapidhash"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02d6ba76b70191f99a2c53bb367c118d5064fa33b6aa6a102fa7751b902c7049"
 
 [[package]]
 name = "rayon"

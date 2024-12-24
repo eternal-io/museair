@@ -30,7 +30,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
         ;
 
-    c.benchmark_group("WyHash")
+    c.benchmark_group("wyhash")
         .throughput(Throughput::Bytes(SIZE))
         .bench_function("wyhash-final4", |b| {
             b.iter(|| {
@@ -44,7 +44,16 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
         ;
 
-    c.benchmark_group("KomiHash")
+    c.benchmark_group("rapidhash")
+        .throughput(Throughput::Bytes(SIZE))
+        .bench_function("rapidhash", |b| {
+            b.iter(|| {
+                black_box(rapidhash::rapidhash_seeded(&msg, 42)); // faster than `rapidhash_inline` that force inlined.
+            })
+        })
+        ;
+
+    c.benchmark_group("komihash")
         .throughput(Throughput::Bytes(SIZE))
         .bench_function("komihash", |b| {
             b.iter(|| {

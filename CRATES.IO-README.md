@@ -55,6 +55,7 @@ _Until then, it should only be used for local sessions!_
 | MuseAir-128        |       128-bit |      30.4 GiB/s   |
 | MuseAir-BFast      |        64-bit |    **36.4 GiB/s** |
 | MuseAir-BFast-128  |       128-bit |    **36.3 GiB/s** |
+| [rapidhash]        |        64-bit |      29.4 GiB/s   |
 | [wyhash] 4.2       |        64-bit |      28.4 GiB/s   |
 |  wyhash.condom 4.2 |        64-bit |      22.8 GiB/s   |
 | [komihash] 5.10    |        64-bit |      26.8 GiB/s   |
@@ -62,5 +63,6 @@ _Until then, it should only be used for local sessions!_
 <img src="https://github.com/eternal-io/museair/blob/master/results/bench-smallkeys.png?raw=true" alt="Bench small keys" width="100%" />
 
 
-[wyhash]: https://crates.io/crates/wyhash-final4
-[komihash]: https://crates.io/crates/komihash
+[rapidhash]:    https://crates.io/crates/rapidhash
+[wyhash]:       https://crates.io/crates/wyhash-final4
+[komihash]:     https://crates.io/crates/komihash
