@@ -178,9 +178,9 @@ MuseAir-Standard 将是能够用于通信协议/持久文件格式的最快的�
 
 ## 许可 <sub>/ License</sub>
 
-MuseAir 算法本身以 CC0 许可发布到公共领域。
+MuseAir 散列算法本身及其参考实现 `museair.cpp` 以 CC0 1.0 许可发布到公共领域。
 
-该存储库下的代码（算法实现）以 MIT 和 Apache 2.0 双许可发布。
+除此之外，该存储库下的其它所有代码以 MIT 和 Apache 2.0 双许可发布。
 
 
 [komihash]: https://github.com/avaneev/komihash

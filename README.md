@@ -179,9 +179,9 @@ MuseAir-Standard will be the fastest portable hash available for communication p
 
 ## License
 
-MuseAir algorithm itself is released into the public domain under the CC0 license.
+MuseAir hash algorithm itself and its reference implementation `museair.cpp` are released into the public domain under the CC0 1.0 license.
 
-These codes (implementation) in this repository are released under the MIT or Apache 2.0 dual license, at your option.
+The all other codes in this repository are released under the MIT or Apache 2.0 dual license, at your option.
 
 
 [komihash]: https://github.com/avaneev/komihash
