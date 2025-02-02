@@ -3,7 +3,6 @@ name = "museair"
 version = "0.3.0"
 edition = "2021"
 authors = ["K--Aethiax"]
-publish = true
 
 description = "Fast portable hash algorithm with highest bulk throughput and lowest small key latency (1-32 bytes) among portable hashes listed in SMHasher3, and made improvements for quality and usability."
 
@@ -25,6 +24,10 @@ komihash = "0.4.1"
 wyhash-final4 = "0.2.2"
 wyhash = "0.5.0"
 rapidhash = "1.2.0"
+
+
+[workspace]
+members = ["show-asm"]
 
 
 [[bench]]

@@ -1,0 +1,12 @@
+[package]
+name = "show-asm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+museair = { path = ".." }
+rapidhash = "1.2.0"

@@ -441,6 +441,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "show-asm"
+version = "0.1.0"
+dependencies = [
+ "museair",
+ "rapidhash",
+]
+
+[[package]]
 name = "syn"
 version = "2.0.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
