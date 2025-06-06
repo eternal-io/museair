@@ -64,7 +64,7 @@ static FORCE_INLINE void museair_mumix(uint64_t* state_p, uint64_t* state_q, uin
 
 //------------------------------------------------------------------------------
 
-template <bool bswap, bool bfast, bool b128>
+template <bool bswap, bool b128>
 static FORCE_INLINE void museair_hash_short(const uint8_t* bytes,
                                             const size_t len,
                                             const seed_t seed,
@@ -83,7 +83,7 @@ static inline void MuseAirHash(const void* bytes, const size_t len, const seed_t
     uint64_t out_lo, out_hi;
 
     if (likely(len <= u64x(4))) {
-        museair_hash_short<bswap, bfast, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
+        museair_hash_short<bswap, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
     } else {
         museair_hash_loong<bswap, bfast, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
     }
@@ -105,7 +105,7 @@ static inline void MuseAirHash(const void* bytes, const size_t len, const seed_t
     }
 }
 
-template <bool bswap, bool bfast, bool b128>
+template <bool bswap, bool b128>
 static FORCE_INLINE void museair_hash_short(const uint8_t* bytes,
                                             const size_t len,
                                             const seed_t seed,
@@ -140,20 +140,9 @@ static FORCE_INLINE void museair_hash_short(const uint8_t* bytes,
         *out_lo = lo0 ^ hi1;
         *out_hi = lo1 ^ hi0;
     } else {
-        MathMult::mult64_128(lo2, hi2, i ^ MUSEAIR_CONSTANT[2], j ^ MUSEAIR_CONSTANT[3]);
-        if (!bfast) {
-            i ^= lo2;
-            j ^= hi2;
-        } else {
-            i = lo2;
-            j = hi2;
-        }
-        MathMult::mult64_128(lo2, hi2, i ^ MUSEAIR_CONSTANT[4], j ^ MUSEAIR_CONSTANT[5]);
-        if (!bfast) {
-            *out_lo = i ^ j ^ lo2 ^ hi2;
-        } else {
-            *out_lo = lo2 ^ hi2;
-        }
+        MathMult::mult64_128(i, j, i ^ MUSEAIR_CONSTANT[2], j ^ MUSEAIR_CONSTANT[3]);
+        MathMult::mult64_128(i, j, i ^ MUSEAIR_CONSTANT[4], j ^ MUSEAIR_CONSTANT[5]);
+        *out_lo = i ^ j;
     }
 }
 
