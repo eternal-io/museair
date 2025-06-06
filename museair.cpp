@@ -9,9 +9,9 @@
 
 #include "Mathmult.h"
 
-#define MUSEAIR_ALGORITHM_VERSION "0.3"
+#define MUSEAIR_ALGORITHM_VERSION "0.4-dev"
 
-#define u64x(N) N * 8
+#define u64x(N) (N * 8)
 
 // `AiryAi(0)` mantissa calculated by Y-Cruncher.
 static const uint64_t MUSEAIR_CONSTANT[7] = {
@@ -285,20 +285,19 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
     MathMult::mult64_128(lo0, hi0, i, j);
     MathMult::mult64_128(lo1, hi1, j, k);
     MathMult::mult64_128(lo2, hi2, k, i);
+
     i = lo0 ^ hi2;
     j = lo1 ^ hi0;
     k = lo2 ^ hi1;
 
+    MathMult::mult64_128(lo0, hi0, i, j);
+    MathMult::mult64_128(lo1, hi1, j, k);
+    MathMult::mult64_128(lo2, hi2, k, i);
+
     if (b128) {
-        MathMult::mult64_128(lo0, hi0, i, j);
-        MathMult::mult64_128(lo1, hi1, j, k);
-        MathMult::mult64_128(lo2, hi2, k, i);
         *out_lo = lo0 ^ lo1 ^ hi2;
         *out_hi = hi0 ^ hi1 ^ lo2;
     } else {
-        MathMult::mult64_128(lo0, hi0, i, j);
-        MathMult::mult64_128(lo1, hi1, j, k);
-        MathMult::mult64_128(lo2, hi2, k, i);
         *out_lo = (lo0 ^ hi2) + (lo1 ^ hi0) + (lo2 ^ hi1);
     }
 }
@@ -312,8 +311,9 @@ REGISTER_FAMILY(MuseAir,
 
 REGISTER_HASH(
     MuseAir,
-    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION " @ 64-bit output",
-    $.hash_flags = 0,
+    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", 64-bit output",
+    $.impl       = "portable",
+    $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
@@ -325,8 +325,9 @@ REGISTER_HASH(
 );
 REGISTER_HASH(
     MuseAir_128,
-    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION " @ 128-bit output",
-    $.hash_flags = 0,
+    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", 128-bit output",
+    $.impl       = "portable",
+    $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
@@ -339,8 +340,9 @@ REGISTER_HASH(
 
 REGISTER_HASH(
     MuseAir_BFast,
-    $.desc       = "MuseAir hash BFast variant v" MUSEAIR_ALGORITHM_VERSION " @ 64-bit output",
-    $.hash_flags = 0,
+    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", 64-bit output, BFast variant",
+    $.impl       = "portable",
+    $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
@@ -352,8 +354,9 @@ REGISTER_HASH(
 );
 REGISTER_HASH(
     MuseAir_BFast_128,
-    $.desc       = "MuseAir hash BFast variant v" MUSEAIR_ALGORITHM_VERSION " @ 128-bit output",
-    $.hash_flags = 0,
+    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", 128-bit output, BFast variant",
+    $.impl       = "portable",
+    $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
