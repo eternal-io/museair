@@ -14,9 +14,10 @@
 #define u64x(N) (N * 8)
 
 // `AiryAi(0)` mantissa calculated by Y-Cruncher.
-static const uint64_t MUSEAIR_CONSTANT[6] = {
+static const uint64_t MUSEAIR_CONSTANT[7] = {
     UINT64_C(0x5ae31e589c56e17a), UINT64_C(0x96d7bb04e64f6da9), UINT64_C(0x7ab1006b26f9eb64),
     UINT64_C(0x21233394220b8457), UINT64_C(0x047cb9557c9f3b43), UINT64_C(0xd24f2590c0bcee28),
+    UINT64_C(0x33ea8f71bb6016d8),
 };
 
 //------------------------------------------------------------------------------
@@ -143,19 +144,8 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
 
     uint64_t i, j, k;
 
-    uint64_t lo0 = MUSEAIR_CONSTANT[0];
-    uint64_t lo1 = MUSEAIR_CONSTANT[1];
-    uint64_t lo2 = MUSEAIR_CONSTANT[2];
-    uint64_t lo3 = MUSEAIR_CONSTANT[3];
-    uint64_t lo4 = MUSEAIR_CONSTANT[4];
-    uint64_t lo5 = MUSEAIR_CONSTANT[5];
-
-    uint64_t hi0 = MUSEAIR_CONSTANT[0];
-    uint64_t hi1 = MUSEAIR_CONSTANT[1];
-    uint64_t hi2 = MUSEAIR_CONSTANT[2];
-    uint64_t hi3 = MUSEAIR_CONSTANT[3];
-    uint64_t hi4 = MUSEAIR_CONSTANT[4];
-    uint64_t hi5 = MUSEAIR_CONSTANT[5];
+    uint64_t lo0, lo1, lo2, lo3, lo4, lo5 = MUSEAIR_CONSTANT[6];
+    uint64_t hi0, hi1, hi2, hi3, hi4, hi5;
 
     uint64_t state[6] = {MUSEAIR_CONSTANT[0] + seed, MUSEAIR_CONSTANT[1] - seed, MUSEAIR_CONSTANT[2] ^ seed,
                          MUSEAIR_CONSTANT[3] + seed, MUSEAIR_CONSTANT[4] - seed, MUSEAIR_CONSTANT[5] ^ seed};
@@ -230,6 +220,15 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
         } while (likely(q >= u64x(12)));
 
         state[0] ^= lo5;
+    } else {
+        lo0 = MUSEAIR_CONSTANT[0];
+        lo1 = MUSEAIR_CONSTANT[1];
+        lo2 = MUSEAIR_CONSTANT[2];
+        lo3 = MUSEAIR_CONSTANT[3];
+        hi0 = MUSEAIR_CONSTANT[0];
+        hi1 = MUSEAIR_CONSTANT[1];
+        hi2 = MUSEAIR_CONSTANT[2];
+        hi3 = MUSEAIR_CONSTANT[3];
     }
 
     if (likely(q > u64x(4))) {
@@ -306,8 +305,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x6748B505,
-    $.verification_BE = 0xB8526C3B,
+    $.verification_LE = 0xD6BF57A0,
+    $.verification_BE = 0x21FACB0E,
     $.hashfn_native   = MuseAirHash<false, false, false>,
     $.hashfn_bswap    = MuseAirHash<true, false, false>
 );
@@ -321,8 +320,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0xAAAD94A1,
-    $.verification_BE = 0x7090E0B1,
+    $.verification_LE = 0x34528B32,
+    $.verification_BE = 0xD5C172B6,
     $.hashfn_native   = MuseAirHash<false, false, true>,
     $.hashfn_bswap    = MuseAirHash<true, false, true>
 );
@@ -337,8 +336,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x45C86CDA,
-    $.verification_BE = 0xA03F96ED,
+    $.verification_LE = 0xCBD934F5,
+    $.verification_BE = 0xAA94B35D,
     $.hashfn_native   = MuseAirHash<false, true, false>,
     $.hashfn_bswap    = MuseAirHash<true, true, false>
 );
@@ -352,8 +351,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x3AA95396,
-    $.verification_BE = 0x6563DAAA,
+    $.verification_LE = 0x0CA5D71A,
+    $.verification_BE = 0x3FA81203,
     $.hashfn_native   = MuseAirHash<false, true, true>,
     $.hashfn_bswap    = MuseAirHash<true, true, true>
 );
