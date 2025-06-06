@@ -14,10 +14,9 @@
 #define u64x(N) (N * 8)
 
 // `AiryAi(0)` mantissa calculated by Y-Cruncher.
-static const uint64_t MUSEAIR_CONSTANT[7] = {
+static const uint64_t MUSEAIR_CONSTANT[6] = {
     UINT64_C(0x5ae31e589c56e17a), UINT64_C(0x96d7bb04e64f6da9), UINT64_C(0x7ab1006b26f9eb64),
     UINT64_C(0x21233394220b8457), UINT64_C(0x047cb9557c9f3b43), UINT64_C(0xd24f2590c0bcee28),
-    UINT64_C(0x33ea8f71bb6016d8),
 };
 
 //------------------------------------------------------------------------------
@@ -169,13 +168,24 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
 
     uint64_t i, j, k;
 
-    uint64_t lo0, lo1, lo2, lo3, lo4, lo5 = MUSEAIR_CONSTANT[6];
-    uint64_t hi0, hi1, hi2, hi3, hi4, hi5;
+    uint64_t lo0 = MUSEAIR_CONSTANT[0];
+    uint64_t lo1 = MUSEAIR_CONSTANT[1];
+    uint64_t lo2 = MUSEAIR_CONSTANT[2];
+    uint64_t lo3 = MUSEAIR_CONSTANT[3];
+    uint64_t lo4 = MUSEAIR_CONSTANT[4];
+    uint64_t lo5 = MUSEAIR_CONSTANT[5];
+
+    uint64_t hi0 = MUSEAIR_CONSTANT[0];
+    uint64_t hi1 = MUSEAIR_CONSTANT[1];
+    uint64_t hi2 = MUSEAIR_CONSTANT[2];
+    uint64_t hi3 = MUSEAIR_CONSTANT[3];
+    uint64_t hi4 = MUSEAIR_CONSTANT[4];
+    uint64_t hi5 = MUSEAIR_CONSTANT[5];
 
     uint64_t state[6] = {MUSEAIR_CONSTANT[0] + seed, MUSEAIR_CONSTANT[1] - seed, MUSEAIR_CONSTANT[2] ^ seed,
                          MUSEAIR_CONSTANT[3] + seed, MUSEAIR_CONSTANT[4] - seed, MUSEAIR_CONSTANT[5] ^ seed};
 
-    if (unlikely(q >= u64x(12))) {
+    if (unlikely(q > u64x(12))) {
         do {
             if (!bfast) {
                 state[0] ^= museair_read_u64<bswap>(p + u64x(0));
@@ -247,62 +257,50 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
         state[0] ^= lo5;
     }
 
+    if (likely(q > u64x(4))) {
+        state[0] ^= museair_read_u64<bswap>(p + u64x(0));
+        state[1] ^= museair_read_u64<bswap>(p + u64x(1));
+        MathMult::mult64_128(lo0, hi0, state[0], state[1]);
+
+        if (likely(q > u64x(6))) {
+            state[1] ^= museair_read_u64<bswap>(p + u64x(2));
+            state[2] ^= museair_read_u64<bswap>(p + u64x(3));
+            MathMult::mult64_128(lo1, hi1, state[1], state[2]);
+
+            if (likely(q > u64x(8))) {
+                state[2] ^= museair_read_u64<bswap>(p + u64x(4));
+                state[3] ^= museair_read_u64<bswap>(p + u64x(5));
+                MathMult::mult64_128(lo2, hi2, state[2], state[3]);
+
+                if (likely(q > u64x(10))) {
+                    state[3] ^= museair_read_u64<bswap>(p + u64x(6));
+                    state[4] ^= museair_read_u64<bswap>(p + u64x(7));
+                    MathMult::mult64_128(lo3, hi3, state[3], state[4]);
+                }
+            }
+        }
+    }
+
+    state[4] ^= museair_read_u64<bswap>(p + q - u64x(4));
+    state[5] ^= museair_read_u64<bswap>(p + q - u64x(3));
+    MathMult::mult64_128(lo4, hi4, state[4], state[5]);
+
+    state[5] ^= museair_read_u64<bswap>(p + q - u64x(2));
+    state[0] ^= museair_read_u64<bswap>(p + q - u64x(1));
+    MathMult::mult64_128(lo5, hi5, state[5], state[0]);
+
     i = state[0] - state[1];
     j = state[2] - state[3];
     k = state[4] - state[5];
-
-    lo0 = MUSEAIR_CONSTANT[0];
-    lo1 = MUSEAIR_CONSTANT[1];
-    lo2 = MUSEAIR_CONSTANT[2];
-    hi0 = MUSEAIR_CONSTANT[3];
-    hi1 = MUSEAIR_CONSTANT[4];
-    hi2 = MUSEAIR_CONSTANT[5];
-
-    if (unlikely(q >= u64x(6))) {
-        i ^= museair_read_u64<bswap>(p + u64x(0));
-        j ^= museair_read_u64<bswap>(p + u64x(1));
-        MathMult::mult64_128(lo0, hi0, i, j);
-
-        j ^= museair_read_u64<bswap>(p + u64x(2));
-        k ^= museair_read_u64<bswap>(p + u64x(3));
-        MathMult::mult64_128(lo1, hi1, j, k);
-
-        k ^= museair_read_u64<bswap>(p + u64x(4));
-        i ^= museair_read_u64<bswap>(p + u64x(5));
-        MathMult::mult64_128(lo2, hi2, k, i);
-
-        p += u64x(6);
-        q -= u64x(6);
-    }
 
     int rot = len & 63;
     i = ROTL64(i, rot);
     j = ROTR64(j, rot);
     k ^= len;
 
-    i += lo0 ^ hi0;
-    j += lo1 ^ hi1;
-    k += lo2 ^ hi2;
-
-    if (likely(q >= u64x(2))) {
-        museair_mumix<bfast>(&state[0], &state[3], museair_read_u64<bswap>(p + u64x(0)),
-                             museair_read_u64<bswap>(p + u64x(1)));
-        if (likely(q >= u64x(4))) {
-            museair_mumix<bfast>(&state[1], &state[4], museair_read_u64<bswap>(p + u64x(2)),
-                                 museair_read_u64<bswap>(p + u64x(3)));
-        }
-    }
-
-    museair_mumix<bfast>(&state[2], &state[5], museair_read_u64<bswap>(p + q - u64x(2)),
-                         museair_read_u64<bswap>(p + q - u64x(1)));
-
-    MathMult::mult64_128(lo0, hi0, i, j);
-    MathMult::mult64_128(lo1, hi1, j, k);
-    MathMult::mult64_128(lo2, hi2, k, i);
-
-    i = lo0 ^ hi2;
-    j = lo1 ^ hi0;
-    k = lo2 ^ hi1;
+    i += lo3 ^ hi3 ^ lo4 ^ hi4;
+    j += lo5 ^ hi5 ^ lo0 ^ hi0;
+    k += lo1 ^ hi1 ^ lo2 ^ hi2;
 
     MathMult::mult64_128(lo0, hi0, i, j);
     MathMult::mult64_128(lo1, hi1, j, k);
@@ -354,7 +352,7 @@ REGISTER_HASH(
 
 REGISTER_HASH(
     MuseAir_BFast,
-    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", 64-bit output, BFast variant",
+    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", BFast variant, 64-bit output",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
@@ -368,7 +366,7 @@ REGISTER_HASH(
 );
 REGISTER_HASH(
     MuseAir_BFast_128,
-    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", 128-bit output, BFast variant",
+    $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", BFast variant, 128-bit output",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
