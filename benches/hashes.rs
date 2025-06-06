@@ -1,3 +1,4 @@
+use core::time::Duration;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use wyhash_final4::{generics::WyHashVariant, WyHash64, WyHash64Condom};
 
@@ -65,7 +66,9 @@ fn criterion_benchmark(c: &mut Criterion) {
 
 criterion_group! {
     name=benches;
-    config=Criterion::default();
+    config=Criterion::default()
+        .warm_up_time(Duration::from_millis(500))
+        .measurement_time(Duration::from_millis(1000));
     targets=criterion_benchmark
 }
 criterion_main!(benches);

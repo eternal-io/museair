@@ -591,6 +591,7 @@ impl<const BFAST: bool> core::hash::Hasher for BaseHasher<BFAST> {
 #[cfg(all(test, target_endian = "little"))]
 mod verify {
     use super::*;
+    use rapidhash::rapidrng_fast;
     extern crate std;
 
     #[test]
@@ -650,8 +651,8 @@ mod verify {
             2 => (&bytes[0..1], &bytes[1..2], &[]),
             3 => (&bytes[0..1], &bytes[1..2], &bytes[2..3]),
             n => {
-                let p = wyhash::wyrng(&mut n.clone()) % (n - 2);
-                let q = wyhash::wyrng(&mut !n) % (n - p);
+                let p = rapidrng_fast(&mut n.clone()) % (n - 2);
+                let q = rapidrng_fast(&mut !n) % (n - p);
                 let (x, y) = bytes.split_at(p as usize);
                 let (y, z) = y.split_at(q as usize);
                 (x, y, z)
