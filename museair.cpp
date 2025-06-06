@@ -48,20 +48,6 @@ static FORCE_INLINE void museair_read_short(const uint8_t* bytes, const size_t l
     }
 }
 
-template <bool bfast>
-static FORCE_INLINE void museair_mumix(uint64_t* state_p, uint64_t* state_q, uint64_t input_p, uint64_t input_q) {
-    if (!bfast) {
-        uint64_t lo, hi;
-        *state_p ^= input_p;
-        *state_q ^= input_q;
-        MathMult::mult64_128(lo, hi, *state_p, *state_q);
-        *state_p ^= lo;
-        *state_q ^= hi;
-    } else {
-        MathMult::mult64_128(*state_p, *state_q, *state_p ^ input_p, *state_q ^ input_q);
-    }
-}
-
 //------------------------------------------------------------------------------
 
 template <bool bswap, bool b128>
