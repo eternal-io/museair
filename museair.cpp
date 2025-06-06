@@ -247,17 +247,42 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
         state[0] ^= lo5;
     }
 
+    i = state[0] - state[1];
+    j = state[2] - state[3];
+    k = state[4] - state[5];
+
+    lo0 = MUSEAIR_CONSTANT[0];
+    lo1 = MUSEAIR_CONSTANT[1];
+    lo2 = MUSEAIR_CONSTANT[2];
+    hi0 = MUSEAIR_CONSTANT[3];
+    hi1 = MUSEAIR_CONSTANT[4];
+    hi2 = MUSEAIR_CONSTANT[5];
+
     if (unlikely(q >= u64x(6))) {
-        museair_mumix<bfast>(&state[0], &state[1], museair_read_u64<bswap>(p + u64x(0)),
-                             museair_read_u64<bswap>(p + u64x(1)));
-        museair_mumix<bfast>(&state[2], &state[3], museair_read_u64<bswap>(p + u64x(2)),
-                             museair_read_u64<bswap>(p + u64x(3)));
-        museair_mumix<bfast>(&state[4], &state[5], museair_read_u64<bswap>(p + u64x(4)),
-                             museair_read_u64<bswap>(p + u64x(5)));
+        i ^= museair_read_u64<bswap>(p + u64x(0));
+        j ^= museair_read_u64<bswap>(p + u64x(1));
+        MathMult::mult64_128(lo0, hi0, i, j);
+
+        j ^= museair_read_u64<bswap>(p + u64x(2));
+        k ^= museair_read_u64<bswap>(p + u64x(3));
+        MathMult::mult64_128(lo1, hi1, j, k);
+
+        k ^= museair_read_u64<bswap>(p + u64x(4));
+        i ^= museair_read_u64<bswap>(p + u64x(5));
+        MathMult::mult64_128(lo2, hi2, k, i);
 
         p += u64x(6);
         q -= u64x(6);
     }
+
+    int rot = len & 63;
+    i = ROTL64(i, rot);
+    j = ROTR64(j, rot);
+    k ^= len;
+
+    i += lo0 ^ hi0;
+    j += lo1 ^ hi1;
+    k += lo2 ^ hi2;
 
     if (likely(q >= u64x(2))) {
         museair_mumix<bfast>(&state[0], &state[3], museair_read_u64<bswap>(p + u64x(0)),
@@ -270,17 +295,6 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
 
     museair_mumix<bfast>(&state[2], &state[5], museair_read_u64<bswap>(p + q - u64x(2)),
                          museair_read_u64<bswap>(p + q - u64x(1)));
-
-    /*-------- epilogue --------*/
-
-    i = state[0] - state[1];
-    j = state[2] - state[3];
-    k = state[4] - state[5];
-
-    int rot = len & 63;
-    i = ROTL64(i, rot);
-    j = ROTR64(j, rot);
-    k ^= len;
 
     MathMult::mult64_128(lo0, hi0, i, j);
     MathMult::mult64_128(lo1, hi1, j, k);
@@ -318,8 +332,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0xF89F1683,
-    $.verification_BE = 0xDFEF2570,
+    $.verification_LE = 0x0,
+    $.verification_BE = 0x0,
     $.hashfn_native   = MuseAirHash<false, false, false>,
     $.hashfn_bswap    = MuseAirHash<true, false, false>
 );
@@ -332,8 +346,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0xD3DFE238,
-    $.verification_BE = 0x05EC3BE4,
+    $.verification_LE = 0x0,
+    $.verification_BE = 0x0,
     $.hashfn_native   = MuseAirHash<false, false, true>,
     $.hashfn_bswap    = MuseAirHash<true, false, true>
 );
@@ -347,8 +361,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0xC61BEE56,
-    $.verification_BE = 0x16186D00,
+    $.verification_LE = 0x0,
+    $.verification_BE = 0x0,
     $.hashfn_native   = MuseAirHash<false, true, false>,
     $.hashfn_bswap    = MuseAirHash<true, true, false>
 );
@@ -361,8 +375,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x27939BF1,
-    $.verification_BE = 0xCB4AB283,
+    $.verification_LE = 0x0,
+    $.verification_BE = 0x0,
     $.hashfn_native   = MuseAirHash<false, true, true>,
     $.hashfn_bswap    = MuseAirHash<true, true, true>
 );
