@@ -9,7 +9,7 @@
 
 #include "Mathmult.h"
 
-#define MUSEAIR_ALGORITHM_VERSION "0.4-dev"
+#define MUSEAIR_ALGORITHM_VERSION "0.4-rc1"
 
 #define u64x(N) (N * 8)
 
@@ -315,12 +315,13 @@ REGISTER_HASH(
     $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", 64-bit output",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
-    $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
+    $.impl_flags = FLAG_IMPL_CANONICAL_LE
+                 | FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x0,
-    $.verification_BE = 0x0,
+    $.verification_LE = 0x6748B505,
+    $.verification_BE = 0xB8526C3B,
     $.hashfn_native   = MuseAirHash<false, false, false>,
     $.hashfn_bswap    = MuseAirHash<true, false, false>
 );
@@ -329,12 +330,13 @@ REGISTER_HASH(
     $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", 128-bit output",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
-    $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
+    $.impl_flags = FLAG_IMPL_CANONICAL_LE
+                 | FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x0,
-    $.verification_BE = 0x0,
+    $.verification_LE = 0xAAAD94A1,
+    $.verification_BE = 0x7090E0B1,
     $.hashfn_native   = MuseAirHash<false, false, true>,
     $.hashfn_bswap    = MuseAirHash<true, false, true>
 );
@@ -344,12 +346,13 @@ REGISTER_HASH(
     $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", BFast variant, 64-bit output",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
-    $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
+    $.impl_flags = FLAG_IMPL_CANONICAL_LE
+                 | FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x0,
-    $.verification_BE = 0x0,
+    $.verification_LE = 0x45C86CDA,
+    $.verification_BE = 0xA03F96ED,
     $.hashfn_native   = MuseAirHash<false, true, false>,
     $.hashfn_bswap    = MuseAirHash<true, true, false>
 );
@@ -358,12 +361,13 @@ REGISTER_HASH(
     $.desc       = "MuseAir hash v" MUSEAIR_ALGORITHM_VERSION ", BFast variant, 128-bit output",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
-    $.impl_flags = FLAG_IMPL_MULTIPLY_64_128
+    $.impl_flags = FLAG_IMPL_CANONICAL_LE
+                 | FLAG_IMPL_MULTIPLY_64_128
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x0,
-    $.verification_BE = 0x0,
+    $.verification_LE = 0x3AA95396,
+    $.verification_BE = 0x6563DAAA,
     $.hashfn_native   = MuseAirHash<false, true, true>,
     $.hashfn_bswap    = MuseAirHash<true, true, true>
 );
