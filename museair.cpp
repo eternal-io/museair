@@ -219,7 +219,7 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
 
         } while (likely(q >= u64x(12)));
 
-        state[0] ^= lo5;
+        state[0] ^= lo5;  // don't forget this!
     } else {
         lo0 = MUSEAIR_CONSTANT[0];
         lo1 = MUSEAIR_CONSTANT[1];
