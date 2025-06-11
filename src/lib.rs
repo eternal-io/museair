@@ -148,23 +148,36 @@ macro_rules! min {
 }
 
 //------------------------------------------------------------------------------
+// MSRV friendly.
 
 #[inline(always)]
 const fn read_u32(bytes: &[u8], offset: usize) -> u64 {
-    u32::from_le_bytes(*bytes.split_at(offset).1.first_chunk().unwrap()) as u64
+    u32::from_le_bytes(match bytes.split_at(offset).1.first_chunk() {
+        Some(xs) => *xs,
+        None => unreachable!(),
+    }) as u64
 }
 #[inline(always)]
 const fn read_u32_r(bytes: &[u8], offset_r: usize) -> u64 {
-    u32::from_le_bytes(*bytes.split_at(bytes.len() - offset_r).0.last_chunk().unwrap()) as u64
+    u32::from_le_bytes(match bytes.split_at(bytes.len() - offset_r - 4).1.first_chunk() {
+        Some(xs) => *xs,
+        None => unreachable!(),
+    }) as u64
 }
 
 #[inline(always)]
 const fn read_u64(bytes: &[u8], offset: usize) -> u64 {
-    u64::from_le_bytes(*bytes.split_at(offset).1.first_chunk().unwrap()) as u64
+    u64::from_le_bytes(match bytes.split_at(offset).1.first_chunk() {
+        Some(xs) => *xs,
+        None => unreachable!(),
+    }) as u64
 }
 #[inline(always)]
 const fn read_u64_r(bytes: &[u8], offset_r: usize) -> u64 {
-    u64::from_le_bytes(*bytes.split_at(bytes.len() - offset_r).0.last_chunk().unwrap()) as u64
+    u64::from_le_bytes(match bytes.split_at(bytes.len() - offset_r - 8).1.first_chunk() {
+        Some(xs) => *xs,
+        None => unreachable!(),
+    }) as u64
 }
 
 #[inline(always)]
@@ -371,8 +384,15 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
 
         state[0] ^= lo5; // don't forget this!
     } else {
-        [lo0, lo1, lo2, lo3] = *CONSTANT.first_chunk().unwrap();
-        [hi0, hi1, hi2, hi3] = *CONSTANT.first_chunk().unwrap();
+        lo0 = CONSTANT[0];
+        lo1 = CONSTANT[1];
+        lo2 = CONSTANT[2];
+        lo3 = CONSTANT[3];
+
+        hi0 = CONSTANT[0];
+        hi1 = CONSTANT[1];
+        hi2 = CONSTANT[2];
+        hi3 = CONSTANT[3];
     }
 
     if likely(remainder.len() > u64!(4)) {

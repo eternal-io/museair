@@ -1,5 +1,5 @@
 /target
-/smhasher*
+Cargo.lock
 
 # ignore temporary files.
 /_*
