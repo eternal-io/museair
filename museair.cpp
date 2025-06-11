@@ -9,7 +9,7 @@
 
 #include "Mathmult.h"
 
-#define MUSEAIR_ALGORITHM_VERSION "0.4-rc1"
+#define MUSEAIR_ALGORITHM_VERSION "0.4-rc2"
 
 #define u64x(N) (N * 8)
 
@@ -51,7 +51,7 @@ static FORCE_INLINE void museair_read_short(const uint8_t* bytes, const size_t l
 
 //------------------------------------------------------------------------------
 
-template <bool bswap, bool b128>
+template <bool bswap, bool bfast, bool b128>
 static FORCE_INLINE void museair_hash_short(const uint8_t* bytes,
                                             const size_t len,
                                             const seed_t seed,
@@ -70,7 +70,7 @@ static inline void MuseAirHash(const void* bytes, const size_t len, const seed_t
     uint64_t out_lo, out_hi;
 
     if (likely(len <= u64x(4))) {
-        museair_hash_short<bswap, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
+        museair_hash_short<bswap, bfast, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
     } else {
         museair_hash_loong<bswap, bfast, b128>((const uint8_t*)bytes, len, seed, &out_lo, &out_hi);
     }
@@ -92,7 +92,7 @@ static inline void MuseAirHash(const void* bytes, const size_t len, const seed_t
     }
 }
 
-template <bool bswap, bool b128>
+template <bool bswap, bool bfast, bool b128>
 static FORCE_INLINE void museair_hash_short(const uint8_t* bytes,
                                             const size_t len,
                                             const seed_t seed,
@@ -127,9 +127,18 @@ static FORCE_INLINE void museair_hash_short(const uint8_t* bytes,
         *out_lo = lo0 ^ hi1;
         *out_hi = lo1 ^ hi0;
     } else {
-        MathMult::mult64_128(i, j, i ^ MUSEAIR_CONSTANT[2], j ^ MUSEAIR_CONSTANT[3]);
-        MathMult::mult64_128(i, j, i ^ MUSEAIR_CONSTANT[4], j ^ MUSEAIR_CONSTANT[5]);
-        *out_lo = i ^ j;
+        if (!bfast) {
+            MathMult::mult64_128(lo0, hi0, i ^ MUSEAIR_CONSTANT[2], j ^ MUSEAIR_CONSTANT[3]);
+            MathMult::mult64_128(lo1, hi1, i ^ MUSEAIR_CONSTANT[4], j ^ MUSEAIR_CONSTANT[5]);
+            i += lo0 ^ hi1;
+            j += lo1 ^ hi0;
+            MathMult::mult64_128(lo2, hi2, i, j);
+            *out_lo = i ^ j ^ lo2 ^ hi2;
+        } else {
+            MathMult::mult64_128(i, j, i ^ MUSEAIR_CONSTANT[2], j ^ MUSEAIR_CONSTANT[3]);
+            MathMult::mult64_128(i, j, i ^ MUSEAIR_CONSTANT[4], j ^ MUSEAIR_CONSTANT[5]);
+            *out_lo = i ^ j;
+        }
     }
 }
 
@@ -220,16 +229,10 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
         } while (likely(q >= u64x(12)));
 
         state[0] ^= lo5;  // don't forget this!
-    } else {
-        lo0 = MUSEAIR_CONSTANT[0];
-        lo1 = MUSEAIR_CONSTANT[1];
-        lo2 = MUSEAIR_CONSTANT[2];
-        lo3 = MUSEAIR_CONSTANT[3];
-        hi0 = MUSEAIR_CONSTANT[0];
-        hi1 = MUSEAIR_CONSTANT[1];
-        hi2 = MUSEAIR_CONSTANT[2];
-        hi3 = MUSEAIR_CONSTANT[3];
     }
+
+    lo0 = 0, lo1 = 0, lo2 = 0, lo3 = 0, lo4 = 0, lo5 = 0;
+    hi0 = 0, hi1 = 0, hi2 = 0, hi3 = 0, hi4 = 0, hi5 = 0;
 
     if (likely(q > u64x(4))) {
         state[0] ^= museair_read_u64<bswap>(p + u64x(0));
@@ -305,8 +308,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0xD6BF57A0,
-    $.verification_BE = 0x21FACB0E,
+    $.verification_LE = 0x9BA8FC03,
+    $.verification_BE = 0x0783F09E,
     $.hashfn_native   = MuseAirHash<false, false, false>,
     $.hashfn_bswap    = MuseAirHash<true, false, false>
 );
@@ -320,8 +323,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x34528B32,
-    $.verification_BE = 0xD5C172B6,
+    $.verification_LE = 0x15C9AC7B,
+    $.verification_BE = 0x05A5B2AA,
     $.hashfn_native   = MuseAirHash<false, false, true>,
     $.hashfn_bswap    = MuseAirHash<true, false, true>
 );
@@ -336,8 +339,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0xCBD934F5,
-    $.verification_BE = 0xAA94B35D,
+    $.verification_LE = 0x6B7DE711,
+    $.verification_BE = 0xD1AF2594,
     $.hashfn_native   = MuseAirHash<false, true, false>,
     $.hashfn_bswap    = MuseAirHash<true, true, false>
 );
@@ -351,8 +354,8 @@ REGISTER_HASH(
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x0CA5D71A,
-    $.verification_BE = 0x3FA81203,
+    $.verification_LE = 0x4B7DD85C,
+    $.verification_BE = 0xDFC074CD,
     $.hashfn_native   = MuseAirHash<false, true, true>,
     $.hashfn_bswap    = MuseAirHash<true, true, true>
 );
