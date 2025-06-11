@@ -47,7 +47,7 @@
 ///
 /// If you want to see an older version of the algorithm, check out the historical commits
 /// for [`museair.cpp`](https://github.com/eternal-io/museair/blob/master/museair.cpp) in repository root.
-pub const ALGORITHM_VERSION: &str = "0.4-rc1";
+pub const ALGORITHM_VERSION: &str = "0.4-rc2";
 
 /// MuseAir hash, standard variant, 64-bit output.
 #[inline]
@@ -213,7 +213,7 @@ const fn read_short(bytes: &[u8]) -> (u64, u64) {
 #[inline(always)]
 const fn hash_impl_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
     if likely(bytes.len() <= u64!(4)) {
-        hash_short_64(bytes, seed)
+        hash_short_64::<BFAST>(bytes, seed)
     } else {
         hash_loong_64::<BFAST>(bytes, seed)
     }
@@ -231,12 +231,21 @@ const fn hash_impl_128<const BFAST: bool>(bytes: &[u8], seed: u64) -> u128 {
 //------------------------------------------------------------------------------
 
 #[inline(always)]
-const fn hash_short_64(bytes: &[u8], seed: u64) -> u64 {
+const fn hash_short_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
     let (mut i, mut j);
     (i, j) = hash_short_common(bytes, seed);
-    (i, j) = wmul(i ^ CONSTANT[2], j ^ CONSTANT[3]);
-    (i, j) = wmul(i ^ CONSTANT[4], j ^ CONSTANT[5]);
-    i ^ j
+    if !BFAST {
+        let (lo0, hi0) = wmul(i ^ CONSTANT[2], j ^ CONSTANT[3]);
+        let (lo1, hi1) = wmul(i ^ CONSTANT[4], j ^ CONSTANT[5]);
+        i = i.wrapping_add(lo0 ^ hi1);
+        j = j.wrapping_add(lo1 ^ hi0);
+        let (lo2, hi2) = wmul(i, j);
+        i ^ j ^ lo2 ^ hi2
+    } else {
+        (i, j) = wmul(i ^ CONSTANT[2], j ^ CONSTANT[3]);
+        (i, j) = wmul(i ^ CONSTANT[4], j ^ CONSTANT[5]);
+        i ^ j
+    }
 }
 
 #[inline(always)]
@@ -301,7 +310,6 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
     let mut remainder = bytes;
     let [mut lo0, mut lo1, mut lo2, mut lo3, mut lo4, mut lo5];
     let [mut hi0, mut hi1, mut hi2, mut hi3, mut hi4, mut hi5];
-
     let mut state = [
         CONSTANT[0].wrapping_add(seed),
         CONSTANT[1].wrapping_sub(seed),
@@ -312,8 +320,6 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
     ];
 
     if unlikely(remainder.len() > u64!(12)) {
-        [lo0, lo1, lo2, lo3] = [0; 4];
-        [hi0, hi1, hi2, hi3] = [0; 4];
         lo5 = CONSTANT[6];
 
         while let Some((chunk, rest)) = remainder.split_first_chunk::<{ u64!(12) }>() {
@@ -383,17 +389,10 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
         }
 
         state[0] ^= lo5; // don't forget this!
-    } else {
-        lo0 = CONSTANT[0];
-        lo1 = CONSTANT[1];
-        lo2 = CONSTANT[2];
-        lo3 = CONSTANT[3];
-
-        hi0 = CONSTANT[0];
-        hi1 = CONSTANT[1];
-        hi2 = CONSTANT[2];
-        hi3 = CONSTANT[3];
     }
+
+    [lo0, lo1, lo2, lo3] = [0; 4];
+    [hi0, hi1, hi2, hi3] = [0; 4];
 
     if likely(remainder.len() > u64!(4)) {
         state[0] ^= read_u64(remainder, u64!(0));
@@ -452,22 +451,22 @@ mod verify {
     #[test]
     fn hash_verification() {
         assert_eq!(
-            0xD6BF57A0,
+            0x9BA8FC03,
             hashverify::compute(64, |bytes, seed, out| out
                 .copy_from_slice(&hash(bytes, seed).to_le_bytes()))
         );
         assert_eq!(
-            0x34528B32,
+            0x15C9AC7B,
             hashverify::compute(128, |bytes, seed, out| out
                 .copy_from_slice(&hash_128(bytes, seed).to_le_bytes()))
         );
         assert_eq!(
-            0xCBD934F5,
+            0x6B7DE711,
             hashverify::compute(64, |bytes, seed, out| out
                 .copy_from_slice(&bfast::hash(bytes, seed).to_le_bytes()))
         );
         assert_eq!(
-            0x0CA5D71A,
+            0x4B7DD85C,
             hashverify::compute(128, |bytes, seed, out| out
                 .copy_from_slice(&bfast::hash_128(bytes, seed).to_le_bytes()))
         );
