@@ -39,7 +39,7 @@
 #![deny(unsafe_code)]
 #![doc = include_str!("../CRATES.IO-README.md")]
 #![doc(html_logo_url = "https://github.com/eternal-io/museair/blob/master/MuseAir-icon-light.png?raw=true")]
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 
 /// Currently algorithm version.
 ///
@@ -79,6 +79,9 @@ pub mod bfast {
 }
 
 //------------------------------------------------------------------------------
+
+type State = [u64; 6];
+type Chunk = [u8; 96];
 
 /// `AiryAi(0)` mantissa calculated by Y-Cruncher.
 const CONSTANT: [u64; 7] = [
@@ -145,6 +148,18 @@ macro_rules! min {
             }
         }
     };
+}
+
+#[inline(always)]
+const fn seed_state(seed: u64) -> State {
+    [
+        CONSTANT[0].wrapping_add(seed),
+        CONSTANT[1].wrapping_sub(seed),
+        CONSTANT[2] ^ seed,
+        CONSTANT[3].wrapping_add(seed),
+        CONSTANT[4].wrapping_sub(seed),
+        CONSTANT[5] ^ seed,
+    ]
 }
 
 //------------------------------------------------------------------------------
@@ -285,22 +300,32 @@ const fn hash_short_common(bytes: &[u8], seed: u64) -> (u64, u64) {
 
 //------------------------------------------------------------------------------
 
-#[inline(never)]
-const fn hash_loong_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
-    let (i, j, k) = hash_loong_common::<BFAST>(bytes, seed);
+#[inline(always)]
+const fn epilogue_64((i, j, k): (u64, u64, u64)) -> u64 {
     let (lo0, hi0) = wmul(i, j);
     let (lo1, hi1) = wmul(j, k);
     let (lo2, hi2) = wmul(k, i);
     (lo0 ^ hi2).wrapping_add(lo1 ^ hi0).wrapping_add(lo2 ^ hi1)
 }
 
-#[inline(never)]
-const fn hash_loong_128<const BFAST: bool>(bytes: &[u8], seed: u64) -> u128 {
-    let (i, j, k) = hash_loong_common::<BFAST>(bytes, seed);
+#[inline(always)]
+const fn epilogue_128((i, j, k): (u64, u64, u64)) -> u128 {
     let (lo0, hi0) = wmul(i, j);
     let (lo1, hi1) = wmul(j, k);
     let (lo2, hi2) = wmul(k, i);
     u64s_to_u128(lo0 ^ lo1 ^ hi2, hi0 ^ hi1 ^ lo2)
+}
+
+//------------------------------------------------------------------------------
+
+#[inline(never)]
+const fn hash_loong_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
+    epilogue_64(hash_loong_common::<BFAST>(bytes, seed))
+}
+
+#[inline(never)]
+const fn hash_loong_128<const BFAST: bool>(bytes: &[u8], seed: u64) -> u128 {
+    epilogue_128(hash_loong_common::<BFAST>(bytes, seed))
 }
 
 #[inline(always)]
@@ -308,16 +333,9 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
     debug_assert!(bytes.len() > u64!(4));
 
     let mut remainder = bytes;
+    let mut state = seed_state(seed);
     let [mut lo0, mut lo1, mut lo2, mut lo3, mut lo4, mut lo5];
     let [mut hi0, mut hi1, mut hi2, mut hi3, mut hi4, mut hi5];
-    let mut state = [
-        CONSTANT[0].wrapping_add(seed),
-        CONSTANT[1].wrapping_sub(seed),
-        CONSTANT[2] ^ seed,
-        CONSTANT[3].wrapping_add(seed),
-        CONSTANT[4].wrapping_sub(seed),
-        CONSTANT[5] ^ seed,
-    ];
 
     if unlikely(remainder.len() > u64!(12)) {
         lo5 = CONSTANT[6];
@@ -440,6 +458,240 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
     k = k.wrapping_add(lo1 ^ hi1 ^ lo2 ^ hi2);
 
     (i, j, k)
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Clone)]
+pub struct __IncrementalHasher<const BFAST: bool> {
+    state: State,
+    ring_prev: u64,
+    buffer: Chunk,
+    buffered_len: usize,
+    processed_len: u64,
+}
+
+impl<const BFAST: bool> __IncrementalHasher<BFAST> {
+    pub const fn new() -> Self {
+        Self::with_seed(0)
+    }
+
+    pub const fn with_seed(seed: u64) -> Self {
+        Self {
+            state: seed_state(seed),
+            ring_prev: CONSTANT[6],
+            buffer: [0x00; 96],
+            buffered_len: 0,
+            processed_len: 0,
+        }
+    }
+
+    pub const fn write(&mut self, bytes: &[u8]) {
+        let vacancy = self.buffer.len() - self.buffered_len;
+
+        if bytes.len() < vacancy {
+            let mut i = 0;
+            while i < bytes.len() {
+                self.buffer[self.buffered_len + i] = bytes[i];
+                i += 1;
+            }
+            self.buffered_len += bytes.len();
+        } else {
+            let mut i = 0;
+            while i < vacancy {
+                self.buffer[self.buffered_len + i] = bytes[i];
+                i += 1;
+            }
+            self.buffered_len = 0;
+            self.compress(bytes.split_at(vacancy).1);
+        }
+    }
+
+    pub const fn finish(&self) -> u64 {
+        let tot_len = self.processed_len.wrapping_add(self.buffered_len as u64);
+
+        if unlikely(tot_len <= u64!(4)) {
+            hash_short_64::<BFAST>(self.remainder(), self.restore_seed())
+        } else {
+            epilogue_64(self.finalize(tot_len))
+        }
+    }
+
+    pub const fn finish_128(&self) -> u128 {
+        let tot_len = self.processed_len.wrapping_add(self.buffered_len as u64);
+
+        if unlikely(tot_len <= u64!(4)) {
+            hash_short_128(self.remainder(), self.restore_seed())
+        } else {
+            epilogue_128(self.finalize(tot_len))
+        }
+    }
+
+    #[inline(always)]
+    const fn restore_seed(&self) -> u64 {
+        debug_assert!(self.processed_len == 0);
+        self.state[0].wrapping_sub(CONSTANT[0])
+    }
+
+    #[inline(always)]
+    const fn remainder(&self) -> &[u8] {
+        self.buffer.split_at(self.buffered_len).0
+    }
+
+    #[inline(never)]
+    const fn compress(&mut self, mut remainder: &[u8]) {
+        let mut first = true;
+        loop {
+            let chunk = match first {
+                true => {
+                    first = false;
+                    &self.buffer
+                }
+                false => match remainder.split_first_chunk::<{ u64!(12) }>() {
+                    None => break,
+                    Some((chunk, rest)) => {
+                        remainder = rest;
+                        chunk
+                    }
+                },
+            };
+
+            let mut state = self.state;
+
+            if !BFAST {
+                state[0] ^= read_u64(chunk, u64!(0));
+                state[1] ^= read_u64(chunk, u64!(1));
+                let (lo0, hi0) = wmul(state[0], state[1]);
+                state[0] = state[0].wrapping_add(self.ring_prev ^ hi0);
+
+                state[1] ^= read_u64(chunk, u64!(2));
+                state[2] ^= read_u64(chunk, u64!(3));
+                let (lo1, hi1) = wmul(state[1], state[2]);
+                state[1] = state[1].wrapping_add(lo0 ^ hi1);
+
+                state[2] ^= read_u64(chunk, u64!(4));
+                state[3] ^= read_u64(chunk, u64!(5));
+                let (lo2, hi2) = wmul(state[2], state[3]);
+                state[2] = state[2].wrapping_add(lo1 ^ hi2);
+
+                state[3] ^= read_u64(chunk, u64!(6));
+                state[4] ^= read_u64(chunk, u64!(7));
+                let (lo3, hi3) = wmul(state[3], state[4]);
+                state[3] = state[3].wrapping_add(lo2 ^ hi3);
+
+                state[4] ^= read_u64(chunk, u64!(8));
+                state[5] ^= read_u64(chunk, u64!(9));
+                let (lo4, hi4) = wmul(state[4], state[5]);
+                state[4] = state[4].wrapping_add(lo3 ^ hi4);
+
+                state[5] ^= read_u64(chunk, u64!(10));
+                state[0] ^= read_u64(chunk, u64!(11));
+                let (lo5, hi5) = wmul(state[5], state[0]);
+                state[5] = state[5].wrapping_add(lo4 ^ hi5);
+
+                self.ring_prev = lo5;
+            } else {
+                state[0] ^= read_u64(chunk, u64!(0));
+                state[1] ^= read_u64(chunk, u64!(1));
+                let (lo0, hi0) = wmul(state[0], state[1]);
+                state[0] = self.ring_prev ^ hi0;
+
+                state[1] ^= read_u64(chunk, u64!(2));
+                state[2] ^= read_u64(chunk, u64!(3));
+                let (lo1, hi1) = wmul(state[1], state[2]);
+                state[1] = lo0 ^ hi1;
+
+                state[2] ^= read_u64(chunk, u64!(4));
+                state[3] ^= read_u64(chunk, u64!(5));
+                let (lo2, hi2) = wmul(state[2], state[3]);
+                state[2] = lo1 ^ hi2;
+
+                state[3] ^= read_u64(chunk, u64!(6));
+                state[4] ^= read_u64(chunk, u64!(7));
+                let (lo3, hi3) = wmul(state[3], state[4]);
+                state[3] = lo2 ^ hi3;
+
+                state[4] ^= read_u64(chunk, u64!(8));
+                state[5] ^= read_u64(chunk, u64!(9));
+                let (lo4, hi4) = wmul(state[4], state[5]);
+                state[4] = lo3 ^ hi4;
+
+                state[5] ^= read_u64(chunk, u64!(10));
+                state[0] ^= read_u64(chunk, u64!(11));
+                let (lo5, hi5) = wmul(state[5], state[0]);
+                state[5] = lo4 ^ hi5;
+
+                self.ring_prev = lo5;
+            }
+
+            self.state = state;
+        }
+
+        let mut i = 0;
+        while i < remainder.len() {
+            self.buffer[i] = remainder[i];
+            i += 1;
+        }
+    }
+
+    #[inline]
+    const fn finalize(&self, tot_len: u64) -> (u64, u64, u64) {
+        let [mut lo0, mut lo1, mut lo2, mut lo3, lo4, lo5];
+        let [mut hi0, mut hi1, mut hi2, mut hi3, hi4, hi5];
+
+        [lo0, lo1, lo2, lo3] = [0; 4];
+        [hi0, hi1, hi2, hi3] = [0; 4];
+
+        let mut state = self.state;
+        let remainder = self.remainder();
+
+        if likely(remainder.len() > u64!(4)) {
+            state[0] ^= read_u64(remainder, u64!(0));
+            state[1] ^= read_u64(remainder, u64!(1));
+            (lo0, hi0) = wmul(state[0], state[1]);
+
+            if likely(remainder.len() > u64!(6)) {
+                state[1] ^= read_u64(remainder, u64!(2));
+                state[2] ^= read_u64(remainder, u64!(3));
+                (lo1, hi1) = wmul(state[1], state[2]);
+
+                if likely(remainder.len() > u64!(8)) {
+                    state[2] ^= read_u64(remainder, u64!(4));
+                    state[3] ^= read_u64(remainder, u64!(5));
+                    (lo2, hi2) = wmul(state[2], state[3]);
+
+                    if likely(remainder.len() > u64!(10)) {
+                        state[3] ^= read_u64(remainder, u64!(6));
+                        state[4] ^= read_u64(remainder, u64!(7));
+                        (lo3, hi3) = wmul(state[3], state[4]);
+                    }
+                }
+            }
+        }
+
+        state[4] ^= read_u64_r(remainder, u64!(3));
+        state[5] ^= read_u64_r(remainder, u64!(2));
+        (lo4, hi4) = wmul(state[4], state[5]);
+
+        state[5] ^= read_u64_r(remainder, u64!(1));
+        state[0] ^= read_u64_r(remainder, u64!(0));
+        (lo5, hi5) = wmul(state[5], state[0]);
+
+        let mut i = state[0].wrapping_sub(state[1]);
+        let mut j = state[2].wrapping_sub(state[3]);
+        let mut k = state[4].wrapping_sub(state[5]);
+
+        let rot = tot_len as u32 & 63;
+        i = i.rotate_left(rot);
+        j = j.rotate_right(rot);
+        k ^= tot_len;
+
+        i = i.wrapping_add(lo3 ^ hi3 ^ lo4 ^ hi4);
+        j = j.wrapping_add(lo5 ^ hi5 ^ lo0 ^ hi0);
+        k = k.wrapping_add(lo1 ^ hi1 ^ lo2 ^ hi2);
+
+        (i, j, k)
+    }
 }
 
 //------------------------------------------------------------------------------
