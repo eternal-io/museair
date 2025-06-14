@@ -41,44 +41,36 @@
 #![doc(html_logo_url = "https://github.com/eternal-io/museair/blob/master/MuseAir-icon-light.png?raw=true")]
 // #![warn(missing_docs)]
 
-/// Currently algorithm version.
-///
-/// Note that this is **NOT** the implementation version.
-///
-/// If you want to see an older version of the algorithm, check out the historical commits
-/// for [`museair.cpp`](https://github.com/eternal-io/museair/blob/master/museair.cpp) in repository root.
-pub const ALGORITHM_VERSION: &str = "0.4-rc4";
-
-pub type Hasher = IncrementalHasher<false>;
+pub type Hasher = impls::IncrementalHasher<false>;
 
 /// MuseAir hash, standard variant, 64-bit output.
 #[inline]
 pub const fn hash(bytes: &[u8], seed: u64) -> u64 {
-    hash_impl_64::<false>(bytes, seed)
+    impls::hash_64::<false>(bytes, seed)
 }
 
 /// MuseAir hash, standard variant, 128-bit output.
 #[inline]
 pub const fn hash_128(bytes: &[u8], seed: u64) -> u128 {
-    hash_impl_128::<false>(bytes, seed)
+    impls::hash_128::<false>(bytes, seed)
 }
 
 /// BFast variant.
 pub mod bfast {
     use super::*;
 
-    pub type Hasher = IncrementalHasher<true>;
+    pub type Hasher = impls::IncrementalHasher<true>;
 
     /// MuseAir hash, BFast variant, 64-bit output.
     #[inline]
     pub const fn hash(bytes: &[u8], seed: u64) -> u64 {
-        hash_impl_64::<true>(bytes, seed)
+        impls::hash_64::<true>(bytes, seed)
     }
 
     /// MuseAir hash, BFast variant, 128-bit output.
     #[inline]
     pub const fn hash_128(bytes: &[u8], seed: u64) -> u128 {
-        hash_impl_128::<true>(bytes, seed)
+        impls::hash_128::<true>(bytes, seed)
     }
 }
 
@@ -230,26 +222,6 @@ const fn read_short(bytes: &[u8]) -> (u64, u64) {
 //------------------------------------------------------------------------------
 
 #[inline(always)]
-const fn hash_impl_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
-    if likely(bytes.len() <= u64!(4)) {
-        hash_short_64::<BFAST>(bytes, seed)
-    } else {
-        hash_loong_64::<BFAST>(bytes, seed)
-    }
-}
-
-#[inline(always)]
-const fn hash_impl_128<const BFAST: bool>(bytes: &[u8], seed: u64) -> u128 {
-    if likely(bytes.len() <= u64!(4)) {
-        hash_short_128(bytes, seed)
-    } else {
-        hash_loong_128::<BFAST>(bytes, seed)
-    }
-}
-
-//------------------------------------------------------------------------------
-
-#[inline(always)]
 const fn hash_short_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
     let (mut i, mut j);
     (i, j) = hash_short_common(bytes, seed);
@@ -282,6 +254,8 @@ const fn hash_short_128(bytes: &[u8], seed: u64) -> u128 {
 
 #[inline(always)]
 const fn hash_short_common(bytes: &[u8], seed: u64) -> (u64, u64) {
+    debug_assert!(bytes.len() <= u64!(4));
+
     let len = bytes.len();
     let len_ = bytes.len() as u64;
     let (lo2, hi2) = wmul(seed ^ CONSTANT[0], len_ ^ CONSTANT[1]);
@@ -469,313 +443,343 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
-pub struct IncrementalHasher<const BFAST: bool> {
-    state: State,
-    ring_prev: u64,
-    buffer: Chunk,
-    buffered_len: usize,
-    compressed_len: u64,
-}
+pub mod impls {
+    use super::*;
 
-impl<const BFAST: bool> IncrementalHasher<BFAST> {
-    pub const fn new() -> Self {
-        Self::with_seed(0)
-    }
+    /// Currently algorithm version.
+    ///
+    /// Note that this is **NOT** the implementation version.
+    ///
+    /// If you want to see an older version of the algorithm, check out the historical commits
+    /// for [`museair.cpp`](https://github.com/eternal-io/museair/blob/master/museair.cpp) in repository root.
+    pub const ALGORITHM_VERSION: &str = "0.4-rc4";
 
-    pub const fn with_seed(seed: u64) -> Self {
-        Self {
-            state: seed_state(seed),
-            ring_prev: CONSTANT[6],
-            buffer: [0x00; u64!(12)],
-            buffered_len: 0,
-            compressed_len: 0,
-        }
-    }
-
-    pub const fn write(&mut self, bytes: &[u8]) {
-        let vacancy = self.buffer.len() - self.buffered_len;
-
-        if bytes.len() <= vacancy {
-            self.write_little(bytes);
+    #[inline(always)]
+    pub const fn hash_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
+        if likely(bytes.len() <= u64!(4)) {
+            hash_short_64::<BFAST>(bytes, seed)
         } else {
-            let (bytes, remainder) = bytes.split_at(vacancy);
-            self.write_little(bytes);
-            self.write_many(remainder);
+            hash_loong_64::<BFAST>(bytes, seed)
         }
     }
 
-    pub const fn finish(&self) -> u64 {
-        let tot_len = self.total_len();
-
-        if unlikely(tot_len <= u64!(4)) {
-            hash_short_64::<BFAST>(self.remainder(), self.restore_seed())
+    #[inline(always)]
+    pub const fn hash_128<const BFAST: bool>(bytes: &[u8], seed: u64) -> u128 {
+        if likely(bytes.len() <= u64!(4)) {
+            hash_short_128(bytes, seed)
         } else {
-            epilogue_64(self.finalize(tot_len))
+            hash_loong_128::<BFAST>(bytes, seed)
         }
     }
 
-    pub const fn finish_128(&self) -> u128 {
-        let tot_len = self.total_len();
-
-        if unlikely(tot_len <= u64!(4)) {
-            hash_short_128(self.remainder(), self.restore_seed())
-        } else {
-            epilogue_128(self.finalize(tot_len))
-        }
+    #[derive(Clone)]
+    pub struct IncrementalHasher<const BFAST: bool> {
+        state: State,
+        ring_prev: u64,
+        buffer: Chunk,
+        buffered_len: usize,
+        compressed_len: u64,
     }
 
-    #[inline(always)]
-    const fn total_len(&self) -> u64 {
-        self.compressed_len.wrapping_add(self.buffered_len as u64)
-    }
-
-    #[inline(always)]
-    const fn restore_seed(&self) -> u64 {
-        debug_assert!(self.compressed_len == 0);
-        self.state[0].wrapping_sub(CONSTANT[0])
-    }
-
-    #[inline(always)]
-    const fn remainder(&self) -> &[u8] {
-        self.buffer.split_at(self.buffered_len).0
-    }
-
-    #[inline(always)]
-    const fn end_u64x4(&self) -> [u64; 4] {
-        let mid = self.buffered_len;
-        let mut helper = [0x00; u64!(4)];
-
-        if mid >= u64!(4) {
-            Self::copy_nonoverlapping(self.buffer.split_at(mid - u64!(4)).1.split_at(u64!(4)).0, &mut helper);
-        } else {
-            let (older, newer) = helper.split_at_mut(u64!(4) - mid);
-            Self::copy_nonoverlapping(self.buffer.split_at(mid).0, newer);
-            Self::copy_nonoverlapping(self.buffer.split_at(u64!(12) - (u64!(4) - mid)).1, older);
+    impl<const BFAST: bool> IncrementalHasher<BFAST> {
+        pub const fn new() -> Self {
+            Self::with_seed(0)
         }
 
-        [
-            read_u64_r(&helper, u64!(3)),
-            read_u64_r(&helper, u64!(2)),
-            read_u64_r(&helper, u64!(1)),
-            read_u64_r(&helper, u64!(0)),
-        ]
-    }
-
-    #[inline(always)]
-    const fn copy_nonoverlapping(src: &[u8], dst: &mut [u8]) {
-        debug_assert!(src.len() == dst.len());
-        let mut i = 0;
-        while i < src.len() {
-            dst[i] = src[i];
-            i += 1;
+        pub const fn with_seed(seed: u64) -> Self {
+            Self {
+                state: seed_state(seed),
+                ring_prev: CONSTANT[6],
+                buffer: [0x00; u64!(12)],
+                buffered_len: 0,
+                compressed_len: 0,
+            }
         }
-    }
 
-    #[inline(always)]
-    const fn write_little(&mut self, bytes: &[u8]) {
-        debug_assert!(self.buffered_len + bytes.len() <= self.buffer.len());
-        Self::copy_nonoverlapping(
-            bytes,
-            self.buffer
-                .split_at_mut(self.buffered_len)
-                .1
-                .split_at_mut(bytes.len())
-                .0,
-        );
-        self.buffered_len += bytes.len();
-    }
+        pub const fn write(&mut self, bytes: &[u8]) {
+            let vacancy = self.buffer.len() - self.buffered_len;
 
-    #[inline(never)]
-    const fn write_many(&mut self, mut remainder: &[u8]) {
-        debug_assert!(self.buffered_len == self.buffer.len() && !remainder.is_empty());
-
-        self.buffered_len = 0;
-        let mut first = true;
-        let mut state = self.state;
-
-        loop {
-            let chunk = match first {
-                true => {
-                    first = false;
-                    &self.buffer
-                }
-                false => match remainder.split_first_chunk::<{ u64!(12) }>() {
-                    None => break,
-                    Some((chunk, rest)) => {
-                        if unlikely(rest.is_empty()) {
-                            break;
-                        }
-                        remainder = rest;
-                        chunk
-                    }
-                },
-            };
-
-            if !BFAST {
-                state[0] ^= read_u64(chunk, u64!(0));
-                state[1] ^= read_u64(chunk, u64!(1));
-                let (lo0, hi0) = wmul(state[0], state[1]);
-                state[0] = state[0].wrapping_add(self.ring_prev ^ hi0);
-
-                state[1] ^= read_u64(chunk, u64!(2));
-                state[2] ^= read_u64(chunk, u64!(3));
-                let (lo1, hi1) = wmul(state[1], state[2]);
-                state[1] = state[1].wrapping_add(lo0 ^ hi1);
-
-                state[2] ^= read_u64(chunk, u64!(4));
-                state[3] ^= read_u64(chunk, u64!(5));
-                let (lo2, hi2) = wmul(state[2], state[3]);
-                state[2] = state[2].wrapping_add(lo1 ^ hi2);
-
-                state[3] ^= read_u64(chunk, u64!(6));
-                state[4] ^= read_u64(chunk, u64!(7));
-                let (lo3, hi3) = wmul(state[3], state[4]);
-                state[3] = state[3].wrapping_add(lo2 ^ hi3);
-
-                state[4] ^= read_u64(chunk, u64!(8));
-                state[5] ^= read_u64(chunk, u64!(9));
-                let (lo4, hi4) = wmul(state[4], state[5]);
-                state[4] = state[4].wrapping_add(lo3 ^ hi4);
-
-                state[5] ^= read_u64(chunk, u64!(10));
-                state[0] ^= read_u64(chunk, u64!(11));
-                let (lo5, hi5) = wmul(state[5], state[0]);
-                state[5] = state[5].wrapping_add(lo4 ^ hi5);
-
-                self.ring_prev = lo5;
+            if bytes.len() <= vacancy {
+                self.write_little(bytes);
             } else {
-                state[0] ^= read_u64(chunk, u64!(0));
-                state[1] ^= read_u64(chunk, u64!(1));
-                let (lo0, hi0) = wmul(state[0], state[1]);
-                state[0] = self.ring_prev ^ hi0;
+                let (bytes, remainder) = bytes.split_at(vacancy);
+                self.write_little(bytes);
+                self.write_many(remainder);
+            }
+        }
 
-                state[1] ^= read_u64(chunk, u64!(2));
-                state[2] ^= read_u64(chunk, u64!(3));
-                let (lo1, hi1) = wmul(state[1], state[2]);
-                state[1] = lo0 ^ hi1;
+        pub const fn finish(&self) -> u64 {
+            let tot_len = self.total_len();
 
-                state[2] ^= read_u64(chunk, u64!(4));
-                state[3] ^= read_u64(chunk, u64!(5));
-                let (lo2, hi2) = wmul(state[2], state[3]);
-                state[2] = lo1 ^ hi2;
+            if unlikely(tot_len <= u64!(4)) {
+                hash_short_64::<BFAST>(self.remainder(), self.restore_seed())
+            } else {
+                epilogue_64(self.finalize(tot_len))
+            }
+        }
 
-                state[3] ^= read_u64(chunk, u64!(6));
-                state[4] ^= read_u64(chunk, u64!(7));
-                let (lo3, hi3) = wmul(state[3], state[4]);
-                state[3] = lo2 ^ hi3;
+        pub const fn finish_128(&self) -> u128 {
+            let tot_len = self.total_len();
 
-                state[4] ^= read_u64(chunk, u64!(8));
-                state[5] ^= read_u64(chunk, u64!(9));
-                let (lo4, hi4) = wmul(state[4], state[5]);
-                state[4] = lo3 ^ hi4;
+            if unlikely(tot_len <= u64!(4)) {
+                hash_short_128(self.remainder(), self.restore_seed())
+            } else {
+                epilogue_128(self.finalize(tot_len))
+            }
+        }
 
-                state[5] ^= read_u64(chunk, u64!(10));
-                state[0] ^= read_u64(chunk, u64!(11));
-                let (lo5, hi5) = wmul(state[5], state[0]);
-                state[5] = lo4 ^ hi5;
+        #[inline(always)]
+        const fn total_len(&self) -> u64 {
+            self.compressed_len.wrapping_add(self.buffered_len as u64)
+        }
 
-                self.ring_prev = lo5;
+        #[inline(always)]
+        const fn restore_seed(&self) -> u64 {
+            debug_assert!(self.compressed_len == 0);
+            self.state[0].wrapping_sub(CONSTANT[0])
+        }
+
+        #[inline(always)]
+        const fn remainder(&self) -> &[u8] {
+            self.buffer.split_at(self.buffered_len).0
+        }
+
+        #[inline(always)]
+        const fn end_u64x4(&self) -> [u64; 4] {
+            let mid = self.buffered_len;
+            let mut helper = [0x00; u64!(4)];
+
+            if mid >= u64!(4) {
+                Self::copy_nonoverlapping(self.buffer.split_at(mid - u64!(4)).1.split_at(u64!(4)).0, &mut helper);
+            } else {
+                let (older, newer) = helper.split_at_mut(u64!(4) - mid);
+                Self::copy_nonoverlapping(self.buffer.split_at(mid).0, newer);
+                Self::copy_nonoverlapping(self.buffer.split_at(u64!(12) - (u64!(4) - mid)).1, older);
             }
 
-            self.compressed_len += u64!(12);
+            [
+                read_u64_r(&helper, u64!(3)),
+                read_u64_r(&helper, u64!(2)),
+                read_u64_r(&helper, u64!(1)),
+                read_u64_r(&helper, u64!(0)),
+            ]
         }
 
-        self.state = state;
-        self.write_little(remainder);
-    }
-
-    #[inline]
-    const fn finalize(&self, tot_len: u64) -> (u64, u64, u64) {
-        let [mut lo0, mut lo1, mut lo2, mut lo3, lo4, lo5];
-        let [mut hi0, mut hi1, mut hi2, mut hi3, hi4, hi5];
-
-        [lo0, lo1, lo2, lo3] = [0; 4];
-        [hi0, hi1, hi2, hi3] = [0; 4];
-
-        let mut state = self.state;
-        let remainder = self.remainder();
-        let end_u64x4 = self.end_u64x4();
-
-        if self.compressed_len > 0 {
-            state[0] ^= self.ring_prev;
+        #[inline(always)]
+        const fn copy_nonoverlapping(src: &[u8], dst: &mut [u8]) {
+            debug_assert!(src.len() == dst.len());
+            let mut i = 0;
+            while i < src.len() {
+                dst[i] = src[i];
+                i += 1;
+            }
         }
 
-        if likely(remainder.len() > u64!(4)) {
-            state[0] ^= read_u64(remainder, u64!(0));
-            state[1] ^= read_u64(remainder, u64!(1));
-            (lo0, hi0) = wmul(state[0], state[1]);
+        #[inline(always)]
+        const fn write_little(&mut self, bytes: &[u8]) {
+            debug_assert!(self.buffered_len + bytes.len() <= self.buffer.len());
+            Self::copy_nonoverlapping(
+                bytes,
+                self.buffer
+                    .split_at_mut(self.buffered_len)
+                    .1
+                    .split_at_mut(bytes.len())
+                    .0,
+            );
+            self.buffered_len += bytes.len();
+        }
 
-            if likely(remainder.len() > u64!(6)) {
-                state[1] ^= read_u64(remainder, u64!(2));
-                state[2] ^= read_u64(remainder, u64!(3));
-                (lo1, hi1) = wmul(state[1], state[2]);
+        #[inline(never)]
+        const fn write_many(&mut self, mut remainder: &[u8]) {
+            debug_assert!(self.buffered_len == self.buffer.len() && !remainder.is_empty());
 
-                if likely(remainder.len() > u64!(8)) {
-                    state[2] ^= read_u64(remainder, u64!(4));
-                    state[3] ^= read_u64(remainder, u64!(5));
-                    (lo2, hi2) = wmul(state[2], state[3]);
+            self.buffered_len = 0;
+            let mut first = true;
+            let mut state = self.state;
 
-                    if likely(remainder.len() > u64!(10)) {
-                        state[3] ^= read_u64(remainder, u64!(6));
-                        state[4] ^= read_u64(remainder, u64!(7));
-                        (lo3, hi3) = wmul(state[3], state[4]);
+            loop {
+                let chunk = match first {
+                    true => {
+                        first = false;
+                        &self.buffer
+                    }
+                    false => match remainder.split_first_chunk::<{ u64!(12) }>() {
+                        None => break,
+                        Some((chunk, rest)) => {
+                            if unlikely(rest.is_empty()) {
+                                break;
+                            }
+                            remainder = rest;
+                            chunk
+                        }
+                    },
+                };
+
+                if !BFAST {
+                    state[0] ^= read_u64(chunk, u64!(0));
+                    state[1] ^= read_u64(chunk, u64!(1));
+                    let (lo0, hi0) = wmul(state[0], state[1]);
+                    state[0] = state[0].wrapping_add(self.ring_prev ^ hi0);
+
+                    state[1] ^= read_u64(chunk, u64!(2));
+                    state[2] ^= read_u64(chunk, u64!(3));
+                    let (lo1, hi1) = wmul(state[1], state[2]);
+                    state[1] = state[1].wrapping_add(lo0 ^ hi1);
+
+                    state[2] ^= read_u64(chunk, u64!(4));
+                    state[3] ^= read_u64(chunk, u64!(5));
+                    let (lo2, hi2) = wmul(state[2], state[3]);
+                    state[2] = state[2].wrapping_add(lo1 ^ hi2);
+
+                    state[3] ^= read_u64(chunk, u64!(6));
+                    state[4] ^= read_u64(chunk, u64!(7));
+                    let (lo3, hi3) = wmul(state[3], state[4]);
+                    state[3] = state[3].wrapping_add(lo2 ^ hi3);
+
+                    state[4] ^= read_u64(chunk, u64!(8));
+                    state[5] ^= read_u64(chunk, u64!(9));
+                    let (lo4, hi4) = wmul(state[4], state[5]);
+                    state[4] = state[4].wrapping_add(lo3 ^ hi4);
+
+                    state[5] ^= read_u64(chunk, u64!(10));
+                    state[0] ^= read_u64(chunk, u64!(11));
+                    let (lo5, hi5) = wmul(state[5], state[0]);
+                    state[5] = state[5].wrapping_add(lo4 ^ hi5);
+
+                    self.ring_prev = lo5;
+                } else {
+                    state[0] ^= read_u64(chunk, u64!(0));
+                    state[1] ^= read_u64(chunk, u64!(1));
+                    let (lo0, hi0) = wmul(state[0], state[1]);
+                    state[0] = self.ring_prev ^ hi0;
+
+                    state[1] ^= read_u64(chunk, u64!(2));
+                    state[2] ^= read_u64(chunk, u64!(3));
+                    let (lo1, hi1) = wmul(state[1], state[2]);
+                    state[1] = lo0 ^ hi1;
+
+                    state[2] ^= read_u64(chunk, u64!(4));
+                    state[3] ^= read_u64(chunk, u64!(5));
+                    let (lo2, hi2) = wmul(state[2], state[3]);
+                    state[2] = lo1 ^ hi2;
+
+                    state[3] ^= read_u64(chunk, u64!(6));
+                    state[4] ^= read_u64(chunk, u64!(7));
+                    let (lo3, hi3) = wmul(state[3], state[4]);
+                    state[3] = lo2 ^ hi3;
+
+                    state[4] ^= read_u64(chunk, u64!(8));
+                    state[5] ^= read_u64(chunk, u64!(9));
+                    let (lo4, hi4) = wmul(state[4], state[5]);
+                    state[4] = lo3 ^ hi4;
+
+                    state[5] ^= read_u64(chunk, u64!(10));
+                    state[0] ^= read_u64(chunk, u64!(11));
+                    let (lo5, hi5) = wmul(state[5], state[0]);
+                    state[5] = lo4 ^ hi5;
+
+                    self.ring_prev = lo5;
+                }
+
+                self.compressed_len += u64!(12);
+            }
+
+            self.state = state;
+            self.write_little(remainder);
+        }
+
+        #[inline]
+        const fn finalize(&self, tot_len: u64) -> (u64, u64, u64) {
+            let [mut lo0, mut lo1, mut lo2, mut lo3, lo4, lo5];
+            let [mut hi0, mut hi1, mut hi2, mut hi3, hi4, hi5];
+
+            [lo0, lo1, lo2, lo3] = [0; 4];
+            [hi0, hi1, hi2, hi3] = [0; 4];
+
+            let mut state = self.state;
+            let remainder = self.remainder();
+            let end_u64x4 = self.end_u64x4();
+
+            if self.compressed_len > 0 {
+                state[0] ^= self.ring_prev;
+            }
+
+            if likely(remainder.len() > u64!(4)) {
+                state[0] ^= read_u64(remainder, u64!(0));
+                state[1] ^= read_u64(remainder, u64!(1));
+                (lo0, hi0) = wmul(state[0], state[1]);
+
+                if likely(remainder.len() > u64!(6)) {
+                    state[1] ^= read_u64(remainder, u64!(2));
+                    state[2] ^= read_u64(remainder, u64!(3));
+                    (lo1, hi1) = wmul(state[1], state[2]);
+
+                    if likely(remainder.len() > u64!(8)) {
+                        state[2] ^= read_u64(remainder, u64!(4));
+                        state[3] ^= read_u64(remainder, u64!(5));
+                        (lo2, hi2) = wmul(state[2], state[3]);
+
+                        if likely(remainder.len() > u64!(10)) {
+                            state[3] ^= read_u64(remainder, u64!(6));
+                            state[4] ^= read_u64(remainder, u64!(7));
+                            (lo3, hi3) = wmul(state[3], state[4]);
+                        }
                     }
                 }
             }
+
+            state[4] ^= end_u64x4[0];
+            state[5] ^= end_u64x4[1];
+            (lo4, hi4) = wmul(state[4], state[5]);
+
+            state[5] ^= end_u64x4[2];
+            state[0] ^= end_u64x4[3];
+            (lo5, hi5) = wmul(state[5], state[0]);
+
+            let mut i = state[0].wrapping_sub(state[1]);
+            let mut j = state[2].wrapping_sub(state[3]);
+            let mut k = state[4].wrapping_sub(state[5]);
+
+            let rot = tot_len as u32 & 63;
+            i = i.rotate_left(rot);
+            j = j.rotate_right(rot);
+            k ^= tot_len;
+
+            i = i.wrapping_add(lo3 ^ hi3 ^ lo4 ^ hi4);
+            j = j.wrapping_add(lo5 ^ hi5 ^ lo0 ^ hi0);
+            k = k.wrapping_add(lo1 ^ hi1 ^ lo2 ^ hi2);
+
+            (i, j, k)
+        }
+    }
+
+    impl<const BFAST: bool> Default for IncrementalHasher<BFAST> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl<const BFAST: bool> core::hash::Hasher for IncrementalHasher<BFAST> {
+        fn finish(&self) -> u64 {
+            self.finish()
         }
 
-        state[4] ^= end_u64x4[0];
-        state[5] ^= end_u64x4[1];
-        (lo4, hi4) = wmul(state[4], state[5]);
-
-        state[5] ^= end_u64x4[2];
-        state[0] ^= end_u64x4[3];
-        (lo5, hi5) = wmul(state[5], state[0]);
-
-        let mut i = state[0].wrapping_sub(state[1]);
-        let mut j = state[2].wrapping_sub(state[3]);
-        let mut k = state[4].wrapping_sub(state[5]);
-
-        let rot = tot_len as u32 & 63;
-        i = i.rotate_left(rot);
-        j = j.rotate_right(rot);
-        k ^= tot_len;
-
-        i = i.wrapping_add(lo3 ^ hi3 ^ lo4 ^ hi4);
-        j = j.wrapping_add(lo5 ^ hi5 ^ lo0 ^ hi0);
-        k = k.wrapping_add(lo1 ^ hi1 ^ lo2 ^ hi2);
-
-        (i, j, k)
-    }
-}
-
-impl<const BFAST: bool> Default for IncrementalHasher<BFAST> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<const BFAST: bool> core::hash::Hasher for IncrementalHasher<BFAST> {
-    fn finish(&self) -> u64 {
-        self.finish()
+        fn write(&mut self, bytes: &[u8]) {
+            self.write(bytes);
+        }
     }
 
-    fn write(&mut self, bytes: &[u8]) {
-        self.write(bytes);
-    }
-}
-
-impl<const BFAST: bool> core::fmt::Debug for IncrementalHasher<BFAST> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        if BFAST {
-            f.debug_struct("MuseAirHasher(BFast)")
-                .field("total_bytes_written", &self.total_len())
-                .finish_non_exhaustive()
-        } else {
-            f.debug_struct("MuseAirHasher")
-                .field("total_bytes_written", &self.total_len())
-                .finish_non_exhaustive()
+    impl<const BFAST: bool> core::fmt::Debug for IncrementalHasher<BFAST> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            if BFAST {
+                f.debug_struct("MuseAirHasher(BFast)")
+                    .field("total_bytes_written", &self.total_len())
+                    .finish_non_exhaustive()
+            } else {
+                f.debug_struct("MuseAirHasher")
+                    .field("total_bytes_written", &self.total_len())
+                    .finish_non_exhaustive()
+            }
         }
     }
 }
