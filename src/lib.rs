@@ -47,7 +47,7 @@
 ///
 /// If you want to see an older version of the algorithm, check out the historical commits
 /// for [`museair.cpp`](https://github.com/eternal-io/museair/blob/master/museair.cpp) in repository root.
-pub const ALGORITHM_VERSION: &str = "0.4-rc2";
+pub const ALGORITHM_VERSION: &str = "0.4-rc4";
 
 pub type Hasher = IncrementalHasher<false>;
 
@@ -256,8 +256,7 @@ const fn hash_short_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
     if !BFAST {
         let (lo0, hi0) = wmul(i ^ CONSTANT[2], j ^ CONSTANT[3]);
         let (lo1, hi1) = wmul(i ^ CONSTANT[4], j ^ CONSTANT[5]);
-        i = i.wrapping_add(lo0 ^ hi1);
-        j = j.wrapping_add(lo1 ^ hi0);
+        (i, j) = (lo0 ^ hi1, lo1 ^ hi0);
         let (lo2, hi2) = wmul(i, j);
         i ^ j ^ lo2 ^ hi2
     } else {
@@ -345,6 +344,10 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
         lo5 = CONSTANT[6];
 
         while let Some((chunk, rest)) = remainder.split_first_chunk::<{ u64!(12) }>() {
+            if unlikely(rest.is_empty()) {
+                break;
+            }
+
             remainder = rest;
 
             if !BFAST {
@@ -493,12 +496,11 @@ impl<const BFAST: bool> IncrementalHasher<BFAST> {
     pub const fn write(&mut self, bytes: &[u8]) {
         let vacancy = self.buffer.len() - self.buffered_len;
 
-        if bytes.len() < vacancy {
+        if bytes.len() <= vacancy {
             self.write_little(bytes);
         } else {
             let (bytes, remainder) = bytes.split_at(vacancy);
             self.write_little(bytes);
-            self.buffered_len = 0;
             self.write_many(remainder);
         }
     }
@@ -540,12 +542,17 @@ impl<const BFAST: bool> IncrementalHasher<BFAST> {
     }
 
     #[inline(always)]
-    const fn remainder_u64x4(&self) -> [u64; 4] {
-        let mut helper = [0x00; u64!(12)];
-        let (newer, older) = self.buffer.split_at(self.buffered_len);
-        let (older2, newer2) = helper.split_at_mut(u64!(12) - self.buffered_len);
-        Self::copy_nonoverlapping(older, older2);
-        Self::copy_nonoverlapping(newer, newer2);
+    const fn end_u64x4(&self) -> [u64; 4] {
+        let mid = self.buffered_len;
+        let mut helper = [0x00; u64!(4)];
+
+        if mid >= u64!(4) {
+            Self::copy_nonoverlapping(self.buffer.split_at(mid - u64!(4)).1.split_at(u64!(4)).0, &mut helper);
+        } else {
+            let (older, newer) = helper.split_at_mut(u64!(4) - mid);
+            Self::copy_nonoverlapping(self.buffer.split_at(mid).0, newer);
+            Self::copy_nonoverlapping(self.buffer.split_at(u64!(12) - (u64!(4) - mid)).1, older);
+        }
 
         [
             read_u64_r(&helper, u64!(3)),
@@ -567,7 +574,7 @@ impl<const BFAST: bool> IncrementalHasher<BFAST> {
 
     #[inline(always)]
     const fn write_little(&mut self, bytes: &[u8]) {
-        debug_assert!(bytes.len() <= self.buffer.len() - self.buffered_len);
+        debug_assert!(self.buffered_len + bytes.len() <= self.buffer.len());
         Self::copy_nonoverlapping(
             bytes,
             self.buffer
@@ -581,6 +588,9 @@ impl<const BFAST: bool> IncrementalHasher<BFAST> {
 
     #[inline(never)]
     const fn write_many(&mut self, mut remainder: &[u8]) {
+        debug_assert!(self.buffered_len == self.buffer.len() && !remainder.is_empty());
+
+        self.buffered_len = 0;
         let mut first = true;
         let mut state = self.state;
 
@@ -593,6 +603,9 @@ impl<const BFAST: bool> IncrementalHasher<BFAST> {
                 false => match remainder.split_first_chunk::<{ u64!(12) }>() {
                     None => break,
                     Some((chunk, rest)) => {
+                        if unlikely(rest.is_empty()) {
+                            break;
+                        }
                         remainder = rest;
                         chunk
                     }
@@ -682,7 +695,7 @@ impl<const BFAST: bool> IncrementalHasher<BFAST> {
 
         let mut state = self.state;
         let remainder = self.remainder();
-        let remainder_u64x4 = self.remainder_u64x4();
+        let end_u64x4 = self.end_u64x4();
 
         if self.compressed_len > 0 {
             state[0] ^= self.ring_prev;
@@ -712,12 +725,12 @@ impl<const BFAST: bool> IncrementalHasher<BFAST> {
             }
         }
 
-        state[4] ^= remainder_u64x4[0];
-        state[5] ^= remainder_u64x4[1];
+        state[4] ^= end_u64x4[0];
+        state[5] ^= end_u64x4[1];
         (lo4, hi4) = wmul(state[4], state[5]);
 
-        state[5] ^= remainder_u64x4[2];
-        state[0] ^= remainder_u64x4[3];
+        state[5] ^= end_u64x4[2];
+        state[0] ^= end_u64x4[3];
         (lo5, hi5) = wmul(state[5], state[0]);
 
         let mut i = state[0].wrapping_sub(state[1]);
@@ -754,22 +767,22 @@ mod verify {
     #[test]
     fn hash_verification() {
         assert_eq!(
-            0x9BA8FC03,
+            0xF3F76DF0,
             hashverify::compute(64, |bytes, seed, out| out
                 .copy_from_slice(&hash(bytes, seed).to_le_bytes()))
         );
         assert_eq!(
-            0x15C9AC7B,
+            0xF42EF1BB,
             hashverify::compute(128, |bytes, seed, out| out
                 .copy_from_slice(&hash_128(bytes, seed).to_le_bytes()))
         );
         assert_eq!(
-            0x6B7DE711,
+            0xB970C19E,
             hashverify::compute(64, |bytes, seed, out| out
                 .copy_from_slice(&bfast::hash(bytes, seed).to_le_bytes()))
         );
         assert_eq!(
-            0x4B7DD85C,
+            0xA15818FE,
             hashverify::compute(128, |bytes, seed, out| out
                 .copy_from_slice(&bfast::hash_128(bytes, seed).to_le_bytes()))
         );
