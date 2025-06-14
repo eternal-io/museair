@@ -756,6 +756,30 @@ impl<const BFAST: bool> Default for IncrementalHasher<BFAST> {
     }
 }
 
+impl<const BFAST: bool> core::hash::Hasher for IncrementalHasher<BFAST> {
+    fn finish(&self) -> u64 {
+        self.finish()
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        self.write(bytes);
+    }
+}
+
+impl<const BFAST: bool> core::fmt::Debug for IncrementalHasher<BFAST> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if BFAST {
+            f.debug_struct("MuseAirHasher(BFast)")
+                .field("total_bytes_written", &self.total_len())
+                .finish_non_exhaustive()
+        } else {
+            f.debug_struct("MuseAirHasher")
+                .field("total_bytes_written", &self.total_len())
+                .finish_non_exhaustive()
+        }
+    }
+}
+
 //------------------------------------------------------------------------------
 
 #[cfg(test)]
