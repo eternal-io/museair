@@ -247,11 +247,11 @@ const fn read_u32_r(bytes: &[u8], offset_r: usize) -> u64 {
 
 #[inline(always)]
 const fn read_u64(bytes: &[u8], offset: usize) -> u64 {
-    u64::from_le_bytes(*bytes.split_at(offset).1.first_chunk().unwrap()) as u64
+    u64::from_le_bytes(*bytes.split_at(offset).1.first_chunk().unwrap())
 }
 #[inline(always)]
 const fn read_u64_r(bytes: &[u8], offset_r: usize) -> u64 {
-    u64::from_le_bytes(*bytes.split_at(bytes.len() - offset_r).0.last_chunk().unwrap()) as u64
+    u64::from_le_bytes(*bytes.split_at(bytes.len() - offset_r).0.last_chunk().unwrap())
 }
 
 #[inline(always)]
