@@ -13,7 +13,7 @@
 
 #define u64x(N) (N * 8)
 
-// `AiryAi(0)` mantissa calculated by Y-Cruncher.
+// `AiryAi(0)` fractional part calculated by Y-Cruncher.
 static const uint64_t MUSEAIR_CONSTANT[7] = {
     UINT64_C(0x5ae31e589c56e17a), UINT64_C(0x96d7bb04e64f6da9), UINT64_C(0x7ab1006b26f9eb64),
     UINT64_C(0x21233394220b8457), UINT64_C(0x047cb9557c9f3b43), UINT64_C(0xd24f2590c0bcee28),

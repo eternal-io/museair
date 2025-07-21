@@ -79,7 +79,7 @@ pub mod bfast {
 type State = [u64; 6];
 type Chunk = [u8; 96];
 
-/// `AiryAi(0)` mantissa calculated by Y-Cruncher.
+/// `AiryAi(0)` fractional part calculated by Y-Cruncher.
 const CONSTANT: [u64; 7] = [
     0x5ae31e589c56e17a,
     0x96d7bb04e64f6da9,
