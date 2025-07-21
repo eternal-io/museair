@@ -36,42 +36,86 @@
  */
 
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![doc = include_str!("../CRATES.IO-README.md")]
 #![doc(html_logo_url = "https://github.com/eternal-io/museair/blob/master/MuseAir-icon-light.png?raw=true")]
-// #![warn(missing_docs)]
+#![warn(missing_docs)]
 
-pub type Hasher = impls::IncrementalHasher<false>;
-
-/// MuseAir hash, standard variant, 64-bit output.
+/// Computes the 64-bit MuseAir hash for a byte slice. *(standard variant)*
 #[inline]
 pub const fn hash(bytes: &[u8], seed: u64) -> u64 {
     impls::hash_64::<false>(bytes, seed)
 }
 
-/// MuseAir hash, standard variant, 128-bit output.
+/// Computes the 128-bit MuseAir hash for a byte slice. *(standard variant)*
 #[inline]
 pub const fn hash_128(bytes: &[u8], seed: u64) -> u128 {
     impls::hash_128::<false>(bytes, seed)
 }
 
-/// BFast variant.
+/// An incremental [`hasher`] that uses the MuseAir hash algorithm. *(standard variant)*
+///
+/// Note that due to the nature of the algorithm,
+/// incrementally hashing small keys may be significantly slower than
+/// one-shot functions that hash an entire key at once.
+///
+/// If you need a fast hasher and primarily work with small keys,
+/// consider using [`musemap`](https://crates.io/crates/musemap).
+///
+/// [`hasher`]: core::hash::Hasher
+pub type Hasher = impls::IncrementalHasher<false>;
+
+/// An incremental [`BuildHasher`] that uses the MuseAir hash algorithm. *(standard variant)*
+///
+/// Note that due to the nature of the algorithm,
+/// incrementally hashing small keys may be significantly slower than
+/// one-shot functions that hash an entire key at once.
+///
+/// If you need a fast hasher and primarily work with small keys,
+/// consider using [`musemap`](https://crates.io/crates/musemap).
+///
+/// [`BuildHasher`]: core::hash::BuildHasher
+pub type BuildHasher = core::hash::BuildHasherDefault<Hasher>;
+
+/// The *BFast variant* of the MuseAir hash algorithm.
 pub mod bfast {
     use super::*;
 
-    pub type Hasher = impls::IncrementalHasher<true>;
-
-    /// MuseAir hash, BFast variant, 64-bit output.
+    /// Computes the 64-bit MuseAir hash for a byte slice. *(BFast variant)*
     #[inline]
     pub const fn hash(bytes: &[u8], seed: u64) -> u64 {
         impls::hash_64::<true>(bytes, seed)
     }
 
-    /// MuseAir hash, BFast variant, 128-bit output.
+    /// Computes the 128-bit MuseAir hash for a byte slice. *(BFast variant)*
     #[inline]
     pub const fn hash_128(bytes: &[u8], seed: u64) -> u128 {
         impls::hash_128::<true>(bytes, seed)
     }
+
+    /// An incremental [`hasher`] that uses the MuseAir hash algorithm. *(BFast variant)*
+    ///
+    /// Note that due to the nature of the algorithm,
+    /// incrementally hashing small keys may be significantly slower than
+    /// one-shot functions that hash an entire key at once.
+    ///
+    /// If you need a fast hasher and primarily work with small keys,
+    /// consider using [`musemap`](https://crates.io/crates/musemap).
+    ///
+    /// [`hasher`]: core::hash::Hasher
+    pub type Hasher = impls::IncrementalHasher<true>;
+
+    /// An incremental [`BuildHasher`] that uses the MuseAir hash algorithm. *(BFast variant)*
+    ///
+    /// Note that due to the nature of the algorithm,
+    /// incrementally hashing small keys may be significantly slower than
+    /// one-shot functions that hash an entire key at once.
+    ///
+    /// If you need a fast hasher and primarily work with small keys,
+    /// consider using [`musemap`](https://crates.io/crates/musemap).
+    ///
+    /// [`BuildHasher`]: core::hash::BuildHasher
+    pub type BuildHasher = core::hash::BuildHasherDefault<Hasher>;
 }
 
 //------------------------------------------------------------------------------
@@ -430,17 +474,20 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
 
 //------------------------------------------------------------------------------
 
+/// Implementation details of the MuseAir hash algorithm.
 pub mod impls {
     use super::*;
 
-    /// Currently algorithm version.
+    /// Current version of the MuseAir hash algorithm.
     ///
-    /// Note that this is **NOT** the implementation version.
+    /// Note: This refers to the algorithm version, not the implementation version.
     ///
-    /// If you want to see an older version of the algorithm, check out the historical commits
-    /// for [`museair.cpp`](https://github.com/eternal-io/museair/blob/master/museair.cpp) in repository root.
+    /// For historical versions, see [`museair.cpp`](https://github.com/eternal-io/museair/blob/master/museair.cpp).
     pub const ALGORITHM_VERSION: &str = "0.4-rc4";
 
+    /// Computes the 64-bit MuseAir hash for a byte slice.
+    ///
+    /// For most use cases, prefer [`hash`] or [`bfast::hash`] instead.
     #[inline(always)]
     pub const fn hash_64<const BFAST: bool>(bytes: &[u8], seed: u64) -> u64 {
         if likely(bytes.len() <= u64!(4)) {
@@ -450,6 +497,9 @@ pub mod impls {
         }
     }
 
+    /// Computes the 128-bit MuseAir hash for a byte slice.
+    ///
+    /// For most use cases, prefer [`hash`] or [`bfast::hash`] instead.
     #[inline(always)]
     pub const fn hash_128<const BFAST: bool>(bytes: &[u8], seed: u64) -> u128 {
         if likely(bytes.len() <= u64!(4)) {
@@ -459,6 +509,16 @@ pub mod impls {
         }
     }
 
+    /// An incremental [`hasher`](core::hash::Hasher) that uses the MuseAir hash algorithm.
+    ///
+    /// Note that due to the nature of the algorithm,
+    /// incrementally hashing small keys may be significantly slower than
+    /// one-shot functions that hash an entire key at once.
+    ///
+    /// If you need a fast hasher and primarily work with small keys,
+    /// consider using [`musemap`](https://crates.io/crates/musemap).
+    ///
+    /// For most use cases, prefer [`Hasher`] or [`bfast::Hasher`] instead.
     #[derive(Clone)]
     pub struct IncrementalHasher<const BFAST: bool> {
         state: State,
@@ -469,11 +529,8 @@ pub mod impls {
     }
 
     impl<const BFAST: bool> IncrementalHasher<BFAST> {
-        pub const fn new() -> Self {
-            Self::with_seed(0)
-        }
-
-        pub const fn with_seed(seed: u64) -> Self {
+        /// Create a new MuseAir hasher with a custom seed.
+        pub const fn new(seed: u64) -> Self {
             Self {
                 state: seed_state(seed),
                 ring_prev: CONSTANT[6],
@@ -483,6 +540,7 @@ pub mod impls {
             }
         }
 
+        /// Write a byte slice to the hasher.
         pub const fn write(&mut self, bytes: &[u8]) {
             let vacancy = self.buffer.len() - self.buffered_len;
 
@@ -495,6 +553,7 @@ pub mod impls {
             }
         }
 
+        /// Returns the 64-bit hash value for the bytes written so far.
         pub const fn finish(&self) -> u64 {
             let tot_len = self.total_len();
 
@@ -505,6 +564,7 @@ pub mod impls {
             }
         }
 
+        /// Returns the 128-bit hash value for the bytes written so far.
         pub const fn finish_128(&self) -> u128 {
             let tot_len = self.total_len();
 
@@ -742,7 +802,7 @@ pub mod impls {
 
     impl<const BFAST: bool> Default for IncrementalHasher<BFAST> {
         fn default() -> Self {
-            Self::new()
+            Self::new(0)
         }
     }
 
@@ -811,7 +871,7 @@ mod verify {
                     let bytes = std::vec![0xAB; n];
                     let one_shot = $hash(&bytes, n as u64);
                     let streamed = {
-                        let mut hasher = <$hasher>::with_seed(n as u64);
+                        let mut hasher = <$hasher>::new(n as u64);
                         let (x, y, z) = random_split(&bytes);
                         hasher.write(x);
                         hasher.write(y);
