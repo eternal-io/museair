@@ -35,7 +35,7 @@
  * SOFTWARE.
  */
 
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
 #![doc = include_str!("../CRATES.IO-README.md")]
 #![doc(html_logo_url = "https://github.com/eternal-io/museair/blob/master/MuseAir-icon-light.png?raw=true")]
@@ -53,29 +53,45 @@ pub const fn hash_128(bytes: &[u8], seed: u64) -> u128 {
     impls::hash_128::<false>(bytes, seed)
 }
 
-/// An incremental [`hasher`] that uses the MuseAir hash algorithm. *(standard variant)*
+/// An incremental [`Hasher`] that uses the MuseAir hash algorithm. *(standard variant)*
 ///
-/// Note that due to the nature of the algorithm,
-/// incrementally hashing small keys may be significantly slower than
-/// one-shot functions that hash an entire key at once.
+/// Note that due to the nature of the algorithm, incrementally hashing small keys may be
+/// significantly slower than one-shot functions that hash an entire key at once.
 ///
-/// If you need a fast hasher and primarily work with small keys,
+/// For better performance with small keys and enhanced HashDoS resistance,
 /// consider using [`musemap`](https://crates.io/crates/musemap).
 ///
-/// [`hasher`]: core::hash::Hasher
+/// [`Hasher`]: core::hash::Hasher
 pub type Hasher = impls::IncrementalHasher<false>;
 
 /// An incremental [`BuildHasher`] that uses the MuseAir hash algorithm. *(standard variant)*
 ///
-/// Note that due to the nature of the algorithm,
-/// incrementally hashing small keys may be significantly slower than
-/// one-shot functions that hash an entire key at once.
+/// Note that due to the nature of the algorithm, incrementally hashing small keys may be
+/// significantly slower than one-shot functions that hash an entire key at once.
 ///
-/// If you need a fast hasher and primarily work with small keys,
+/// For better performance with small keys and enhanced HashDoS resistance,
 /// consider using [`musemap`](https://crates.io/crates/musemap).
 ///
 /// [`BuildHasher`]: core::hash::BuildHasher
 pub type BuildHasher = core::hash::BuildHasherDefault<Hasher>;
+
+/// A [`HashMap`] type that uses the MuseAir [incremental hasher](Hasher). *(standard variant)*
+///
+/// For better performance with small keys and enhanced HashDoS resistance,
+/// consider using [`musemap`](https://crates.io/crates/musemap).
+///
+/// [`HashMap`]: std::collections::HashMap
+#[cfg(feature = "std")]
+pub type HashMap<K, V> = std::collections::HashMap<K, V, BuildHasher>;
+
+/// A [`HashSet`] type that uses the MuseAir [incremental hasher](Hasher). *(standard variant)*
+///
+/// For better performance with small keys and enhanced HashDoS resistance,
+/// consider using [`musemap`](https://crates.io/crates/musemap).
+///
+/// [`HashSet`]: std::collections::HashSet
+#[cfg(feature = "std")]
+pub type HashSet<T> = std::collections::HashSet<T, BuildHasher>;
 
 /// The *BFast variant* of the MuseAir hash algorithm.
 pub mod bfast {
@@ -93,29 +109,45 @@ pub mod bfast {
         impls::hash_128::<true>(bytes, seed)
     }
 
-    /// An incremental [`hasher`] that uses the MuseAir hash algorithm. *(BFast variant)*
+    /// An incremental [`Hasher`] that uses the MuseAir hash algorithm. *(BFast variant)*
     ///
-    /// Note that due to the nature of the algorithm,
-    /// incrementally hashing small keys may be significantly slower than
-    /// one-shot functions that hash an entire key at once.
+    /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
+    /// significantly slower than one-shot functions that hash an entire key at once.
     ///
-    /// If you need a fast hasher and primarily work with small keys,
+    /// For better performance with small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
     ///
-    /// [`hasher`]: core::hash::Hasher
+    /// [`Hasher`]: core::hash::Hasher
     pub type Hasher = impls::IncrementalHasher<true>;
 
     /// An incremental [`BuildHasher`] that uses the MuseAir hash algorithm. *(BFast variant)*
     ///
-    /// Note that due to the nature of the algorithm,
-    /// incrementally hashing small keys may be significantly slower than
-    /// one-shot functions that hash an entire key at once.
+    /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
+    /// significantly slower than one-shot functions that hash an entire key at once.
     ///
-    /// If you need a fast hasher and primarily work with small keys,
+    /// For better performance with small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
     ///
     /// [`BuildHasher`]: core::hash::BuildHasher
     pub type BuildHasher = core::hash::BuildHasherDefault<Hasher>;
+
+    /// A [`HashMap`] type that uses the MuseAir [incremental hasher](Hasher). *(BFast variant)*
+    ///
+    /// For better performance with small keys and enhanced HashDoS resistance,
+    /// consider using [`musemap`](https://crates.io/crates/musemap).
+    ///
+    /// [`HashMap`]: std::collections::HashMap
+    #[cfg(feature = "std")]
+    pub type HashMap<K, V> = std::collections::HashMap<K, V, BuildHasher>;
+
+    /// A [`HashSet`] type that uses the MuseAir [incremental hasher](Hasher). *(BFast variant)*
+    ///
+    /// For better performance with small keys and enhanced HashDoS resistance,
+    /// consider using [`musemap`](https://crates.io/crates/musemap).
+    ///
+    /// [`HashSet`]: std::collections::HashSet
+    #[cfg(feature = "std")]
+    pub type HashSet<T> = std::collections::HashSet<T, BuildHasher>;
 }
 
 //------------------------------------------------------------------------------
@@ -480,7 +512,7 @@ pub mod impls {
 
     /// Current version of the MuseAir hash algorithm.
     ///
-    /// Note: This refers to the algorithm version, not the implementation version.
+    /// Note that dhis refers to the algorithm version, not the implementation version.
     ///
     /// For historical versions, see [`museair.cpp`](https://github.com/eternal-io/museair/blob/master/museair.cpp).
     pub const ALGORITHM_VERSION: &str = "0.4-rc4";

@@ -18,6 +18,16 @@ categories = ["algorithms", "no-std"]
 include = ["src/**"]
 
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+
+[features]
+default = ["std"]
+std = []
+
+
 [dev-dependencies]
 hashverify = "0.1.0"
 criterion = "0.5.1"
