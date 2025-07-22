@@ -53,23 +53,23 @@ pub const fn hash_128(bytes: &[u8], seed: u64) -> u128 {
     impls::hash_128::<false>(bytes, seed)
 }
 
-/// An incremental [`Hasher`] that uses the MuseAir hash algorithm. *(standard variant)*
+/// An incremental [`Hasher`] instance that uses the MuseAir hashing algorithm. *(standard variant)*
 ///
 /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
 /// significantly slower than one-shot functions that hash an entire key at once.
 ///
-/// For better performance with small keys and enhanced HashDoS resistance,
+/// For better hashmap performance on small keys and enhanced HashDoS resistance,
 /// consider using [`musemap`](https://crates.io/crates/musemap).
 ///
 /// [`Hasher`]: core::hash::Hasher
 pub type Hasher = impls::IncrementalHasher<false>;
 
-/// An incremental [`BuildHasher`] that uses the MuseAir hash algorithm. *(standard variant)*
+/// An incremental [`BuildHasher`] instance that uses the MuseAir hashing algorithm. *(standard variant)*
 ///
 /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
 /// significantly slower than one-shot functions that hash an entire key at once.
 ///
-/// For better performance with small keys and enhanced HashDoS resistance,
+/// For better hashmap performance on small keys and enhanced HashDoS resistance,
 /// consider using [`musemap`](https://crates.io/crates/musemap).
 ///
 /// [`BuildHasher`]: core::hash::BuildHasher
@@ -93,7 +93,7 @@ pub type HashMap<K, V> = std::collections::HashMap<K, V, BuildHasher>;
 #[cfg(feature = "std")]
 pub type HashSet<T> = std::collections::HashSet<T, BuildHasher>;
 
-/// The *BFast variant* of the MuseAir hash algorithm.
+/// The *BFast variant* of the MuseAir hashing algorithm.
 pub mod bfast {
     use super::*;
 
@@ -109,23 +109,23 @@ pub mod bfast {
         impls::hash_128::<true>(bytes, seed)
     }
 
-    /// An incremental [`Hasher`] that uses the MuseAir hash algorithm. *(BFast variant)*
+    /// An incremental [`Hasher`] instance that uses the MuseAir hashing algorithm. *(BFast variant)*
     ///
     /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
     /// significantly slower than one-shot functions that hash an entire key at once.
     ///
-    /// For better performance with small keys and enhanced HashDoS resistance,
+    /// For better hashmap performance on small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
     ///
     /// [`Hasher`]: core::hash::Hasher
     pub type Hasher = impls::IncrementalHasher<true>;
 
-    /// An incremental [`BuildHasher`] that uses the MuseAir hash algorithm. *(BFast variant)*
+    /// An incremental [`BuildHasher`] instance that uses the MuseAir hashing algorithm. *(BFast variant)*
     ///
     /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
     /// significantly slower than one-shot functions that hash an entire key at once.
     ///
-    /// For better performance with small keys and enhanced HashDoS resistance,
+    /// For better hashmap performance on small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
     ///
     /// [`BuildHasher`]: core::hash::BuildHasher
@@ -506,13 +506,13 @@ const fn hash_loong_common<const BFAST: bool>(bytes: &[u8], seed: u64) -> (u64, 
 
 //------------------------------------------------------------------------------
 
-/// Implementation details of the MuseAir hash algorithm.
+/// Implementation details of the MuseAir hashing algorithm.
 pub mod impls {
     use super::*;
 
-    /// Current version of the MuseAir hash algorithm.
+    /// Current version of the MuseAir hashing algorithm.
     ///
-    /// Note that dhis refers to the algorithm version, not the implementation version.
+    /// Note that this refers to the algorithm version, not the implementation version.
     ///
     /// For historical versions, see [`museair.cpp`](https://github.com/eternal-io/museair/blob/master/museair.cpp).
     pub const ALGORITHM_VERSION: &str = "0.4-rc4";
@@ -541,13 +541,12 @@ pub mod impls {
         }
     }
 
-    /// An incremental [`hasher`](core::hash::Hasher) that uses the MuseAir hash algorithm.
+    /// An incremental [`hasher`](core::hash::Hasher) instance that uses the MuseAir hashing algorithm.
     ///
-    /// Note that due to the nature of the algorithm,
-    /// incrementally hashing small keys may be significantly slower than
-    /// one-shot functions that hash an entire key at once.
+    /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
+    /// significantly slower than one-shot functions that hash an entire key at once.
     ///
-    /// If you need a fast hasher and primarily work with small keys,
+    /// For better hashmap performance on small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
     ///
     /// For most use cases, prefer [`Hasher`] or [`bfast::Hasher`] instead.
