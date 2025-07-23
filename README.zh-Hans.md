@@ -34,16 +34,14 @@ MuseAir 目前还未稳定，算法的输出将在小版本之间变化。因此
 <td><img width="100%" src="results/bench-bulkdatas-crit.rs.png" alt="Bench bulk datas (using Criterion.rs)" /></td>
 </tr></table>
 
+- wyhash: [repo](https://github.com/wangyi-fudan/wyhash), [rust-impl](https://github.com/thynson/wyhash-final4)
+- rapidhash: [repo](https://github.com/Nicoshev/rapidhash), [rust-impl](https://github.com/hoxxep/rapidhash)
+- komihash: [repo](https://github.com/avaneev/komihash), [rust-impl](https://github.com/thynson/rust-komihash)
+
 ### 小型输入
 
 <img width="100%" src="results/bench-smallkeys.png" alt="Bench small keys (using SMHasher3)" />
 <p align="center"><i>在更常见的 1-32 字节输入上，MuseAir 具有显著的速度优势 (avg. 13.0 cycles/hash)，甚至比 fxhash 更快</i></p>
-
-> #### Useful links
->
-> - wyhash: [repo](https://github.com/wangyi-fudan/wyhash), [rust-impl](https://github.com/thynson/wyhash-final4)
-> - rapidhash: [repo](https://github.com/Nicoshev/rapidhash), [rust-impl](https://github.com/hoxxep/rapidhash)
-> - komihash: [repo](https://github.com/avaneev/komihash), [rust-impl](https://github.com/thynson/rust-komihash)
 
 
 
