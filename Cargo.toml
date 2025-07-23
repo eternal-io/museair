@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.83.0"
 authors = ["K--Aethiax"]
 
-description = "A portable hashing algorithm that heavily optimized for performance and quality. This includes constructions that have never been implemented before."
+description = "A portable hashing algorithm that heavily optimized for performance and quality, incorporating structures never before implemented."
 
 documentation = "https://docs.rs/museair"
 repository = "https://github.com/eternal-io/museair"
