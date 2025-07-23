@@ -9,179 +9,151 @@
 <p align="right"><sup><b><i>简体中文</i></b> 丨 <a href="README.md">English</a></sup></p>
 
 
-MuseAir 是一个快速便携（portable）散列算法，拥有便携散列中最高的吞吐量，并且在短键上也能提供不俗的表现（详见“*基准测试*”）。她还针对质量和可用性进行了改进（详见“*算法分析*”），并且能够[*通过*](results)完整的 [SMHasher3] 扩展测试。
+MuseAir 是一个便携散列算法，针对[性能](#性能)和[质量](#质量)进行了大量优化。这包括了之前从未有人实现过的结构。
 
-MuseAir 提供了两种变体：`Standard`（默认）和 `BFast`。前者提供更好的质量，后者提供更好的性能。
+它拥有两个变体：`Standard`和`BFast`。后者会更快一些，但质量会稍微*差*那么一丢丢。具体的区别请看下方的[算法分析](#算法分析)。
 
-- 两种变体都提供 64 位和 128 位输出，并且开销基本一致。
+MuseAir 不是为了密码学安全而设计的，你不应将其用于安全用途。例如：保证文件未经恶意篡改。对于这类用途，请考虑 SHA-3，Ascon 或 Blake3。
 
-MuseAir **不是**为了密码学安全而设计的，你不应将其用于安全用途，例如，保证文件未经恶意篡改。对于这类用途，请考虑 SHA-3，Ascon 或 Blake3。
-
-此外，MuseAir-`Standard` 计划在一段时间（1.0.0）之后稳定。由于她已提升的质量，届时，她将可以用于以下用途：
-
-- 持久文件格式
-- 通信协议
-- ……
-
-在此之前，她应该只用于本地会话。
+MuseAir 目前还未稳定，算法的输出将在小版本之间变化。因此，暂时不建议将其用于持久格式。
 
 
-## 基准测试 <sub>/ Benchmarks</sub>
 
-    AMD Ryzen 7 5700G 4.6GHz Desktop, Windows 10 22H2, rustc 1.82.0 (f6e511eec 2024-10-15)
+## 性能
 
-    - SMHasher3 (34093a3 2024-06-17) runs in WSL 2 with clang 14.0.0-1ubuntu1.1
+    AMD Ryzen 7 5700G 4.6GHz Desktop, Windows 10 22H2, rustc 1.87.0 (17067e9ac 2025-05-09)
 
+    - SMHasher3 (4568f81 2025-3-22) runs in WSL 2 with clang 14.0.0-1ubuntu1.1
 
-### 大块数据 <sub>/ Bulk datas</sub>
+目前只有这些简单的图表。如果你希望得到更详细的比较，并且愿意提供帮助，就去开一个 issue 吧（GitHub 上请使用英文），或者私信我。
 
-| Hash              | Digest length | Throughput (C++ - SMHasher3) | Throughput (Rust - Criterion.rs) |
-|:----------------- | -------------:| ----------------------------:| --------------------------------:|
-| MuseAir           |        64-bit |                   28.5 GiB/s |                       30.5 GiB/s |
-| MuseAir-128       |       128-bit |                   28.5 GiB/s |                       30.4 GiB/s |
-| MuseAir-BFast     |        64-bit |                   33.3 GiB/s |                       36.4 GiB/s |
-| MuseAir-BFast-128 |       128-bit |                   33.3 GiB/s |                       36.3 GiB/s |
-| rapidhash         |        64-bit |                   31.9 GiB/s |                       29.4 GiB/s |
-| wyhash 4.2        |        64-bit |                   31.9 GiB/s |                       28.4 GiB/s |
-| wyhash.condom 4.2 |        64-bit |                   25.3 GiB/s |                       22.8 GiB/s |
-| komihash 5.7      |        64-bit |                   25.5 GiB/s |                              N/A |
-| komihash 5.10     |        64-bit |                          N/A |                       26.8 GiB/s |
+### 大型输入
 
-<sup>*(These results are obtained by running `./SMHasher3 --test=Speed <HASH>` and `cargo bench`)*</sup>
+<table width="100%"><tr>
+<td><img width="100%" src="results/bench-bulkdatas-smhasher3.png" alt="Bench bulk datas (using SMHasher3)" /></td>
+<td><img width="100%" src="results/bench-bulkdatas-crit.rs.png" alt="Bench bulk datas (using Criterion.rs)" /></td>
+</tr></table>
 
-峰值吞吐量与具体实现有关。但不论如何，对于大块数据，MuseAir 都是便携散列当中最快的，可以达到先前最快（wyhash）的 1.14 倍。
+### 小型输入
 
+<img width="100%" src="results/bench-smallkeys.png" alt="Bench small keys (using SMHasher3)" />
+<p align="center"><i>在更常见的 1-32 字节输入上，MuseAir 具有显著的速度优势 (avg. 13.0 cycles/hash)，甚至比 fxhash 更快</i></p>
 
-### 短键 <sub>/ Small keys</sub>
-
-<img src="results/bench-smallkeys.png" alt="Bench small keys" width="100%" />
-
-<sup>*(These results are obtained by running `./SMHasher3 --test=Speed <HASH>`)*</sup>
-
-对于更加常见的 1-32 bytes 短键，MuseAir 系列算法拥有显著的性能优势。在这个范围内，平均而言，她仍是最快的。
+> #### Useful links
+>
+> - wyhash: [repo](https://github.com/wangyi-fudan/wyhash), [rust-impl](https://github.com/thynson/wyhash-final4)
+> - rapidhash: [repo](https://github.com/Nicoshev/rapidhash), [rust-impl](https://github.com/hoxxep/rapidhash)
+> - komihash: [repo](https://github.com/avaneev/komihash), [rust-impl](https://github.com/thynson/rust-komihash)
 
 
-## 实现 <sub>/ Implementations</sub>
 
-这个存储库提供 MuseAir 的官方 Rust 实现，你可以在 [crates.io](https://crates.io/crates/museair) 上找到这个 crate。
+## 质量
 
-| Language | Link
-|:-------- |:----
-| **C**    | [eternal-io/museair-c](https://github.com/eternal-io/museair-c)
+MuseAir 的所有变体均通过了完整的 [SMHasher3](https://gitlab.com/fwojcik/smhasher3) 扩展测试（使用 `--extra` 标志）。该测试套件是非加密散列算法质量的事实标准，通过该测试意味着散列算法的质量已经足以投入生产。完整的测试输出可以在 [results](results) 目录下找到。
+
+> *由于核心算法的质量已被验证，且目前没有任何重大变更，因此 0.4 版本之后只提供了 BFast_64-bit 的测试结果。*
+
+
+
+## 实现
+
+该存储库提供官方 Rust 实现，你可以在 [crates.io](https://crates.io/crates/museair) 上找到它。
+
+#### 第三方实现
+
+| Language | Link | Remark
+|:-------- |:---- |:------
+| **C**    | [eternal-io/museair-c](https://github.com/eternal-io/museair-c) | *已弃坑，欢迎来人填坑*
 | **C++**  | [Twilight-Dream-Of-Magic/museair-cpp](https://github.com/Twilight-Dream-Of-Magic/museair-cpp)
 
 
-## 算法分析 <sub>/ Algorithm analysis</sub>
 
-首先定义 `wide_mul` 和 `fold_mul`：
+## 算法分析
+
+### TL;DR
+
+- 即便是质量稍差的 `BFast` 变体也拥有比其它竞争者更好的质量，并且拥有最好的性能表现，这就是你应该使用 MuseAir 的理由。
+- 质量更好的 `Standard` 变体则完全不受致盲乘法的影响，同时也有相当好的性能表现，非常适合用于持久文件格式或通信协议（*然而，它还尚未稳定*）。
+
+
+### 对小型输入的处理
+
+在图表中，你可以看到 MuseAir 对 16-32 字节输入的处理显著快于其它竞争者。这是因为它解决了数据依赖（_data hazard_）问题：对第 16-32 字节的处理不需要等待第 0-16 字节的完成，有效利用了流水线，显著降低了延迟。
+
+
+### 对大块数据的处理
+
+MuseAir 的核心步骤依赖于*宽乘法*，也就是 `64位 × 64位 -> 128位` 的乘法。
+
+从计算原理上看，乘法可以分解为一系列移位与加法的组合，这使得乘法天然具备一定的混淆（confusion）与扩散（diffusion）性质。在大多数现代处理器上，乘法只需要一条指令即可完成。相较于手动组合其它运算，宽乘法在性能与实现复杂度上具有显著优势。因此，近年来推出的非加密散列算法大多都依赖于宽乘法。这些算法有 [wyhash]，[rapidhash] 和 [komihash] 等。
+
+wyhash 和 rapidhash 的核心步骤是这样的：在一个循环中，大块输入被划分为多个条带……
 
 ```rust
-/// 64 x 64 -> 128 multiplication, returns lower 64-bit, then upper 64-bit.
-fn wide_mul(a: u64, b: u64) -> (u64, u64) {
-    x = a as u128 * b as u128;
-    (x as u64, (x >> 64) as u64)
-}
-
-/// XOR-fold the lower half and the upper half of the multiplication result.
-fn fold_mul(a: u64, b: u64) -> u64 {
-    let (lo, hi) = wide_mul(a, b);
-    lo ^ hi
-}
+lane0 = fold_mul( lane0 ^ input[0], CONSTANT[0] ^ input[1] );
+lane1 = fold_mul( lane1 ^ input[2], CONSTANT[1] ^ input[3] );
+lane2 = fold_mul( lane2 ^ input[4], CONSTANT[2] ^ input[5] );
+// ...可能有更多条带...
 ```
 
-**对于短键**，之所以对 16-32 字节长度有显著提速，主要是因为解决了数据依赖问题，使得那部分的乘法运算不需要等待先前数据，有效地利用了 CPU 流水线：
+其中，`fold_mul` 叫*折叠乘法*。它的的作用是进行一次宽乘法，并将 128 位乘法结果的高 64 位与低 64 位进行异或，然后返回。`CONSTANT` 是一组魔法常数，用于给状态提供一些熵。
+
+乍一看，这一切好像没有问题。借助宽乘法，输入的每一位都有机会在条带内完全扩散。输入又被划分为多个条带、分别处理，以便有效利用流水线进行指令级并行。对吗？
+
+如果一切都这么顺利就好了。我们不应该忽略任何一种情形，尤其是众所周知的、与乘法的基本性质相关的情形。在上述例子中，如果 `CONSTANT[0] ^ input[1] == 0` 会怎么样？嘭！一阵魔法烟雾过后，你会发现 `lane0` 的值变成了零。也就是说，这一条带上的所有信息都消失了，条带上先前的输入将不会影响最终的结果！这一情形又被称为*致盲乘法*。增加条带数量不过是缓兵之计，因为所有条带都有可能遭遇致盲乘法。
+
+> 该死，我们不该忘了“*零乘以任何数都等于零*”的！
+
+从这一角度上来说，若 `CONSTANT` 不得不公开，那么即便是 CRCs（循环冗余校验）也能够提供更好的安全属性（即便它们都是非加密的）。假设你设计了自己的持久文件格式或通信协议，并且希望添加一个简单的校验和，那么你是不论如何都不会希望使用 wyhash 或 rapidhash 的——在这种用途上，它们实在是*太容易*被破解了！提供一个“没有这些显著问题”的快速散列算法，也是 MuseAir 的设计动机。
+
+---
+
+为了解决上述问题，MuseAir 提出了**环形累加器组**结构：
 
 ```rust
-/* not what they actually read, just to simplify the situation. */
+state[0] ^= input[0];
+state[1] ^= input[1];
+(lo0, hi0) = wide_mul(state[0], state[1]);
+state[0] = lo5 ^ hi0;
 
-let mut acc_i = read_u64(&bytes[0..8]);
-let mut acc_j = read_u64(&bytes[8..16]);
+state[1] ^= input[2];
+state[2] ^= input[3];
+(lo1, hi1) = wide_mul(state[1], state[2]);
+state[1] = lo0 ^ hi1;
 
-if bytes.len() > 16 {
-    let (lo0, hi0) = wide_mul(CONSTANT[2], CONSTANT[3] ^ read_u64(&bytes[16..24]));
-    let (lo1, hi1) = wide_mul(CONSTANT[4], CONSTANT[5] ^ read_u64(&bytes[24..32]));
-    acc_i ^= lo0 ^ hi1;
-    acc_j ^= lo1 ^ hi0;
-}
-```
-
-**对于大块数据**，考虑 wyhash 的核心循环：
-
-```rust
-acc0 = fold_mul(acc0 ^ read_u64(&bytes[8 * 0..]), SECRET[0] ^ read_u64(&bytes[8 * 1..]));
-acc1 = fold_mul(acc1 ^ read_u64(&bytes[8 * 2..]), SECRET[1] ^ read_u64(&bytes[8 * 3..]));
-acc2 = fold_mul(acc2 ^ read_u64(&bytes[8 * 4..]), SECRET[2] ^ read_u64(&bytes[8 * 5..]));
-                                /* Left side */                        /* Right side */
-```
-
-实际上有以下问题：
-
-1. 将输入划分为多个条带分别处理，条带之间没有扩散（diffusion）。
-2. 宽乘法后直接折叠，尽管有利于混淆（confusion）和进一步扩散，但也会造成一定的*熵损失*，有可能依此设计出碰撞。
-3. 当*右侧*输入恰好与 `SECRET[n]` 相同时，会导致其中一个乘数为零。由于乘法的性质“零乘以任何数都等于零”，当前条带的累加器将被毁灭性清零，过去的所有状态都将不复存在。这一情形也被称作“致盲乘法”——在这里，设计碰撞实际上非常容易，它的安全性完全来自于 `SECRET[..]` 的保密，一组与种子（seed）无关的常数。因此这类攻击也被称作“种子无关攻击”。这限制了它在通信协议、持久文件格式等方面的应用。
-
-实际上，为了缓解问题 3，wyhash 还提出了 `condom` 模式，使用修改的折叠乘法：
-
-```rust
-fn fold_mul(a: u64, b: u64) -> u64 {
-    let (lo, hi) = wide_mul(a, b);
-    a ^ b ^ lo ^ hi
-}
-```
-
-显然能够避免致盲乘法问题。但当*右侧*持续为零时，*左侧*的输入将完全不会扩散，还将被后来的输入反复覆盖。此外，还有超过 20% 的性能下降。此时已有其它算法比它快且好了，比如 [komihash]。
-
-为了解决上述所有问题，MuseAir 提出了**环形累加器组**结构：
-
-```rust
-/* `wrapping_add` omitted. */
-
-state[0] ^= read_u64(&bytes[8 * 0..]);
-state[1] ^= read_u64(&bytes[8 * 1..]);
-let (lo0, hi0) = wide_mul(state[0], state[1]);
-state[0] += ring_prev ^ hi0;
-
-state[1] ^= read_u64(&bytes[8 * 2..]);
-state[2] ^= read_u64(&bytes[8 * 3..]);
-let (lo1, hi1) = wide_mul(state[1], state[2]);
-state[1] += lo0 ^ hi1;
+state[2] ^= input[4];
+state[3] ^= input[5];
+(lo1, hi1) = wide_mul(state[2], state[3]);
+state[2] = lo1 ^ hi2;
 
 ...
 
-state[5] ^= read_u64(&bytes[8 * 10..]);
-state[0] ^= read_u64(&bytes[8 * 11..]);
-let (lo5, hi5) = wide_mul(state[5], state[0]);
-state[5] += lo4 ^ hi5;
-
-ring_prev = lo5;
+state[5] ^= input[10];
+state[0] ^= input[11];
+(lo5, hi5) = wide_mul(state[5], state[0]);
+state[5] = lo4 ^ hi5;
 ```
 
-这是 `Standard` 变体的累加器组。对于 `BFast` 变体，直接将 `+=` 替换成 `=` 即是。
+这是 `BFast` 变体的累加器组。其中，`wide_mul` 执行 128 位宽乘法，返回一个二元组，依次是乘法的低 64 位结果和高 64 位结果。可以看到，由于没有与常数的直接混合，受到致盲乘法的概率将大大降低。即便是刻意设计的输入，通常也只会导致最近的 8 个字节不影响输出。而不像 wyhash 或 rapidhash 那样，轻松就能导致过去三分之一的输入不影响输出！
 
-对于问题 1 和 2：所有累加器的更新皆来自于本次乘法的高 64 位结果和上次乘法的低 64 位结果，拥有良好的扩散性质。
+`Standard` 变体的累加器组则将 `=` 全部替换成了 `+=`，彻底不受致盲乘法的影响。
 
-对于问题 3：由于乘数总是动态的，且得益于良好的扩散，MuseAir 不会遭受种子无关攻击。至于致盲乘法，`Standard` 变体没有对累加器的覆写，因此不受此影响。`BFast` 变体有对累加器的覆写，需要进行简单讨论：
+此外，由于输入没有被划分为多个条带，MuseAir 还具有更好的扩散性质：每一位输入最终都可能影响整个状态，而不像 wyhash 或 rapidhash 那样，至多只能影响三分之一的状态。
 
-- 若在某次读入之后，`state[0] == 0 && state[1] != 0`，则接下来覆写累加器时，不会导致任何数据丢失。同时，由于乘法结果的滞后混入，`state[0]` 几乎不会陷入全零状态。
-- 若在某次读入之后，`state[0] != 0 && state[1] == 0`，则接下来覆写累加器时，会导致读入`state[0]`的那部分数据（8 字节）丢失。至于更先前的数据，则早已被扩散至整个状态中，不受影响。同样，`state[0]` 几乎不会陷入全零状态，但对于`state[1]`：
-  - 如果接下来的读取不幸碰上了全零块，或是前七个字节都是零，最后一个字节是 `0x01`（对于普遍输入而言，只有 $2^{-127}$ 概率能走到这里），那么它在这一轮内都会保持全零。
-  - 当然，它更有可能碰上非全零块。在接下来的乘法完成之后，拥有宝贵混合的高 64 位乘法结果还会立刻让它从低熵状态中恢复。
+于是，结合[性能表现](#性能)，我们得到了结论：
 
-综上，对于普遍输入，MuseAir-BFast 只有 $2^{-64}$ 概率导致某 8 个字节的输入不影响输出。参考 wyhash，有 $2^{-63}$ 概率导致过去三分之一的输入不影响输出。
-
-至于性能，它的提升主要来自对指令级并行（ILP）的深入理解。基准测试表明 MuseAir-Standard 与 wyhash 的性能差异在 6% 以下。
-
-MuseAir-Standard 将是能够用于通信协议/持久文件格式的最快的便携散列。
-
-<sub>_扩展资料：MuseAir 0.2 算法介绍，[B站专栏](https://www.bilibili.com/read/cv37413023) 或 [知乎文章](https://zhuanlan.zhihu.com/p/715753300)。尽管介绍的是老版本，但其中有一些未在此处提及的设计动机，没有太大变动，仍具有一定参考性。_</sub>
+- 即便是质量稍差的 `BFast` 变体也拥有比其它竞争者更好的质量，并且拥有最好的性能表现，这就是你应该使用 MuseAir 的理由。
+- 质量更好的 `Standard` 变体则完全不受致盲乘法的影响，同时也有相当好的性能表现，非常适合用于持久文件格式或通信协议（*然而，它还尚未稳定*）。
 
 
-## 许可 <sub>/ License</sub>
 
-MuseAir 散列算法本身及其参考实现 `museair.cpp` 以 CC0 1.0 许可发布到公共领域。
+## 开源协议
 
-除此之外，该存储库下的其它所有代码以 MIT 和 Apache 2.0 双许可发布。
+MuseAir 散列算法本身及其参考实现 [`museair.cpp`](museair.cpp) 以 CC0 1.0 许可发布到公共领域。
+
+除此之外，该存储库下的所有代码以 MIT 和 Apache 2.0 双许可发布。
 
 
+[wyhash]: https://github.com/wangyi-fudan/wyhash
+[rapidhash]: https://github.com/Nicoshev/rapidhash
 [komihash]: https://github.com/avaneev/komihash
-[SMHasher3]: https://gitlab.com/fwojcik/smhasher3
