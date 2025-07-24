@@ -8,15 +8,15 @@
 
 <p align="right"><sup><b><i>English</i></b> 丨 <a href="README.zh-Hans.md">简体中文</a></sup></p>
 
-MuseAir is **a portable hashing algorithm** that heavily optimized for [performance](#performance) and [quality](#quality), incorporating structures never before implemented. It offers two variants: `Standard` and `BFast`. The latter is faster but slightly *lower* in quality. For detailed differences, refer to the [algorithm analysis](#algorithm-analysis) below.
+MuseAir is **a portable hashing algorithm** that heavily optimized for [performance](#benchmarks) and [quality](#quality), incorporating structures never before implemented. It offers two variants: `Standard` and `BFast`. The latter is faster but slightly *lower* in quality. For detailed differences, refer to the [algorithm analysis](#algorithm-analysis) below.
 
-MuseAir is **not designed for cryptographic security**, and should not be used for security purposes, such as ensuring files have not been maliciously tampered with. For such use cases, consider SHA-3, Ascon, or Blake3.
+MuseAir is **not designed for cryptographic security** and should not be used for security-critical purposes like protection against malicious tampering. For such cases, consider SHA-3, Ascon, or Blake3 instead.
 
-MuseAir is **currently unstable**, and its output may change between minor versions. Therefore, it is not yet recommended for persistent formats.
+MuseAir is **currently unstable** and its output may change between minor versions. Therefore, it is not yet recommended for persistent formats.
 
 
 
-## Performance
+## Benchmarks
 
     AMD Ryzen 7 5700G 4.6GHz Desktop, Windows 10 22H2, rustc 1.87.0 (17067e9ac 2025-05-09)
 
@@ -24,7 +24,7 @@ MuseAir is **currently unstable**, and its output may change between minor versi
 
 Only simple charts are provided for now. If you'd like more detailed comparisons and are willing to contribute, please open an issue.
 
-### Bulk datas
+### Hashing bulk datas
 
 <table width="100%"><tr>
 <td><img width="100%" src="results/bench-bulkdatas-smhasher3.png" alt="Bench bulk datas (using SMHasher3)" /></td>
@@ -35,18 +35,18 @@ Only simple charts are provided for now. If you'd like more detailed comparisons
 - rapidhash: [original](https://github.com/Nicoshev/rapidhash), [rust-impl](https://github.com/hoxxep/rapidhash)
 - komihash: [original](https://github.com/avaneev/komihash), [rust-impl](https://github.com/thynson/rust-komihash)
 
-### Small keys
+### Hashing small keys
 
 <img width="100%" src="results/bench-smallkeys.png" alt="Bench small keys (using SMHasher3)" />
-<p align="center"><i>For common 1-32 byte keys, MuseAir has a significant speed advantage (avg. 13.0 cycles/hash), even outperforming fxhash</i></p>
+<p align="center"><i>For common 1-32 byte keys, MuseAir has a significant speed advantage (avg. 13.0 cycles/hash), even outperforming fxhash.</i></p>
 
 
 
 ## Quality
 
-All variants of MuseAir have passed the full [SMHasher3](https://gitlab.com/fwojcik/smhasher3) extended test suite (with the `--extra` flag). This test suite is the de facto standard for non-crypto hashing algorithm quality, and passing it means the algorithm is production-ready. Full test results can be found in the [results](results) directory.
+All MuseAir variants have passed the complete [SMHasher3](https://gitlab.com/fwojcik/smhasher3) extended test suite (with `--extra` flag). As the de facto standard for non-cryptographic hashing quality, passing these tests confirms production readiness. See full results in the [results](results) directory.
 
-> *Since the core algorithm's quality has been verified and no major changes are expected, only BFast_64-bit test results are provided after version 0.4.*
+> *Since the core algorithm's quality has been verified with no major changes expected, only BFast_64-bit test results are provided after version 0.4.*
 
 
 
@@ -56,19 +56,19 @@ This repository provides the official Rust implementation, available on [crates.
 
 #### Third-party
 
-| Language | Link | Remark
-|:-------- |:---- |:------
+| Language | Link | Note
+|:-------- |:---- |:----
 | **C**    | [eternal-io/museair-c](https://github.com/eternal-io/museair-c) | *Abandoned, new implementations welcome*
 | **C++**  | [Twilight-Dream-Of-Magic/museair-cpp](https://github.com/Twilight-Dream-Of-Magic/museair-cpp)
 
 
 
-## Algorithm Analysis
+## Algorithm analysis
 
 ### TL;DR
 
-- Even the slightly lower-quality `BFast` variant offers better quality than other competitors while delivering the best performance -- this is the reason you should use MuseAir.
-- The higher-quality `Standard` variant is entirely immune to blinding multiplication while maintaining excellent performance, making it suitable for persistent file formats or communication protocols (*though it is not yet stable*).
+- Even the slightly *lower*-quality `BFast` variant offers better quality than other competitors while delivering the best performance -- this is the reason you should use MuseAir.
+- The higher-quality `Standard` variant is entirely immune to blinding multiplication while maintaining excellent performance, making it suitable for persistent file formats or communication protocols (though note the algorithm is not yet stable).
 
 ### Handling small keys
 
@@ -97,7 +97,7 @@ If only it were that simple. We must consider all scenarios, especially those re
 
 > We shouldn't forget that "*zero times anything equals zero*!"
 
-From this perspective, if `CONSTANT` must be public, even CRCs (cyclic redundancy checks) offer better security properties -- though they are all non-cryptographic. If you're designing a persistent file format or communication protocol and want a simple checksum, you wouldn't want to use wyhash or rapidhash -- they're *too easy* to break for such uses! Providing a fast hashing algorithm without these glaring issues was MuseAir's design motivation.
+From this perspective, if `CONSTANT` must be public, even CRCs (cyclic redundancy checks) offer better security properties -- though they are all non-cryptographic. If you're designing a persistent file format or communication protocol and want a simple checksum, you wouldn't want to use wyhash or rapidhash -- they're *too easy* to break for such uses! Providing *a fast hashing algorithm without these glaring issues* was MuseAir's design motivation.
 
 ---
 
@@ -127,7 +127,7 @@ state[0] ^= input[11];
 state[5] = lo4 ^ hi5;
 ```
 
-This is the accumulator group for the `BFast` variant. Here, `wide_mul` performs a 128-bit wide multiplication, returning a tuple of the low and high 64 bits. Since there's no direct mixing with constants, the probability of blinding multiplication is dramatically reduced. Even with crafted inputs, typically only the most recent 8 bytes might not affect the output -- unlike wyhash or rapidhash, where a third of prior inputs can easily be made irrelevant!
+This is the accumulator group for the `BFast` variant. Here, `wide_mul` performs a 128-bit wide multiplication, returning a tuple of the low and high 64 bits. Since there's no direct mixing with constants, both the probability and impact of blinding multiplication are dramatically reduced. Even with crafted inputs, typically only the most recent 8 bytes might not affect the output -- unlike wyhash or rapidhash, where a third of prior inputs can easily be made irrelevant!
 
 The `Standard` variant replaces all `=` with `+=`, making it entirely immune to blinding multiplication.
 
@@ -135,8 +135,8 @@ Additionally, since inputs aren't split into lanes, MuseAir offers better diffus
 
 Thus, combining [performance](#performance), we conclude:
 
-- Even the slightly lower-quality `BFast` variant offers better quality than other competitors while delivering the best performance -- this is the reason you should use MuseAir.
-- The higher-quality `Standard` variant is entirely immune to blinding multiplication while maintaining excellent performance, making it suitable for persistent file formats or communication protocols (*though it is not yet stable*).
+- Even the slightly *lower*-quality `BFast` variant offers better quality than other competitors while delivering the best performance -- this is the reason you should use MuseAir.
+- The higher-quality `Standard` variant is entirely immune to blinding multiplication while maintaining excellent performance, making it suitable for persistent file formats or communication protocols (though note the algorithm is not yet stable).
 
 
 
