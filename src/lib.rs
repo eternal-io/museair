@@ -35,6 +35,7 @@
  * SOFTWARE.
  */
 
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
 #![doc = include_str!("../CRATES.IO-README.md")]
