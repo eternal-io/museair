@@ -38,7 +38,7 @@ Only simple charts are provided for now. If you'd like more detailed comparisons
 ### Hashing small keys
 
 <img width="100%" src="results/bench-smallkeys.png" alt="Bench small keys (using SMHasher3)" />
-<p align="center"><i>For common 1-32 byte keys, MuseAir has a significant speed advantage (avg. 13.0 cycles/hash), even outperforming fxhash.</i></p>
+<p align="center"><sup>For common 1-32 byte keys, MuseAir has a significant speed advantage (avg. 13.0 cycles/hash), even outperforming fxhash.</sup></p>
 
 
 
