@@ -55,8 +55,7 @@ pub const fn hash_128(bytes: &[u8], seed: u64) -> u128 {
 
 /// An incremental [`Hasher`] instance that uses the MuseAir hashing algorithm. *(standard variant)*
 ///
-/// Note that due to the nature of the algorithm, incrementally hashing small keys may be
-/// significantly slower than one-shot functions that hash an entire key at once.
+/// Note that incrementally hashing small keys will be significantly slower than one-shot hashing.
 ///
 /// For better hashmap performance on small keys and enhanced HashDoS resistance,
 /// consider using [`musemap`](https://crates.io/crates/musemap).
@@ -64,34 +63,34 @@ pub const fn hash_128(bytes: &[u8], seed: u64) -> u128 {
 /// [`Hasher`]: core::hash::Hasher
 pub type Hasher = impls::IncrementalHasher<false>;
 
-/// An incremental [`BuildHasher`] instance that uses the MuseAir hashing algorithm. *(standard variant)*
+/// A [`BuildHasher`] for the MuseAir incremental [`Hasher`] that always has the same fixed seed.
+/// *(standard variant)*
 ///
-/// Note that due to the nature of the algorithm, incrementally hashing small keys may be
-/// significantly slower than one-shot functions that hash an entire key at once.
+/// Note that incrementally hashing small keys will be significantly slower than one-shot hashing.
 ///
 /// For better hashmap performance on small keys and enhanced HashDoS resistance,
 /// consider using [`musemap`](https://crates.io/crates/musemap).
 ///
 /// [`BuildHasher`]: core::hash::BuildHasher
-pub type BuildHasher = core::hash::BuildHasherDefault<Hasher>;
+pub type FixedState = impls::FixedState<false>;
 
-/// A [`HashMap`] type that uses the MuseAir [incremental hasher](Hasher). *(standard variant)*
+/// A [`HashMap`] type that uses the MuseAir incremental [`Hasher`]. *(standard variant)*
 ///
 /// For better performance with small keys and enhanced HashDoS resistance,
 /// consider using [`musemap`](https://crates.io/crates/musemap).
 ///
 /// [`HashMap`]: std::collections::HashMap
 #[cfg(feature = "std")]
-pub type HashMap<K, V> = std::collections::HashMap<K, V, BuildHasher>;
+pub type HashMap<K, V> = std::collections::HashMap<K, V, FixedState>;
 
-/// A [`HashSet`] type that uses the MuseAir [incremental hasher](Hasher). *(standard variant)*
+/// A [`HashSet`] type that uses the MuseAir incremental [`Hasher`]. *(standard variant)*
 ///
 /// For better performance with small keys and enhanced HashDoS resistance,
 /// consider using [`musemap`](https://crates.io/crates/musemap).
 ///
 /// [`HashSet`]: std::collections::HashSet
 #[cfg(feature = "std")]
-pub type HashSet<T> = std::collections::HashSet<T, BuildHasher>;
+pub type HashSet<T> = std::collections::HashSet<T, FixedState>;
 
 /// The *BFast variant* of the MuseAir hashing algorithm.
 pub mod bfast {
@@ -111,8 +110,7 @@ pub mod bfast {
 
     /// An incremental [`Hasher`] instance that uses the MuseAir hashing algorithm. *(BFast variant)*
     ///
-    /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
-    /// significantly slower than one-shot functions that hash an entire key at once.
+    /// Note that incrementally hashing small keys will be significantly slower than one-shot hashing.
     ///
     /// For better hashmap performance on small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
@@ -120,34 +118,34 @@ pub mod bfast {
     /// [`Hasher`]: core::hash::Hasher
     pub type Hasher = impls::IncrementalHasher<true>;
 
-    /// An incremental [`BuildHasher`] instance that uses the MuseAir hashing algorithm. *(BFast variant)*
+    /// A [`BuildHasher`] for the MuseAir incremental [`Hasher`] that always has the same fixed seed.
+    /// *(BFast variant)*
     ///
-    /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
-    /// significantly slower than one-shot functions that hash an entire key at once.
+    /// Note that incrementally hashing small keys will be significantly slower than one-shot hashing.
     ///
     /// For better hashmap performance on small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
     ///
     /// [`BuildHasher`]: core::hash::BuildHasher
-    pub type BuildHasher = core::hash::BuildHasherDefault<Hasher>;
+    pub type FixedState = impls::FixedState<true>;
 
-    /// A [`HashMap`] type that uses the MuseAir [incremental hasher](Hasher). *(BFast variant)*
+    /// A [`HashMap`] type that uses the MuseAir incremental [`Hasher`]. *(BFast variant)*
     ///
     /// For better performance with small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
     ///
     /// [`HashMap`]: std::collections::HashMap
     #[cfg(feature = "std")]
-    pub type HashMap<K, V> = std::collections::HashMap<K, V, BuildHasher>;
+    pub type HashMap<K, V> = std::collections::HashMap<K, V, FixedState>;
 
-    /// A [`HashSet`] type that uses the MuseAir [incremental hasher](Hasher). *(BFast variant)*
+    /// A [`HashSet`] type that uses the MuseAir incremental [`Hasher`]. *(BFast variant)*
     ///
     /// For better performance with small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
     ///
     /// [`HashSet`]: std::collections::HashSet
     #[cfg(feature = "std")]
-    pub type HashSet<T> = std::collections::HashSet<T, BuildHasher>;
+    pub type HashSet<T> = std::collections::HashSet<T, FixedState>;
 }
 
 //------------------------------------------------------------------------------
@@ -541,10 +539,39 @@ pub mod impls {
         }
     }
 
+    /// A [`BuildHasher`] for the MuseAir [`IncrementalHasher`] that always has the same fixed seed.
+    ///
+    /// Note that incrementally hashing small keys will be significantly slower than one-shot hashing.
+    ///
+    /// For better hashmap performance on small keys and enhanced HashDoS resistance,
+    /// consider using [`musemap`](https://crates.io/crates/musemap).
+    ///
+    /// For most use cases, prefer [`crate::FixedState`] or [`bfast::FixedState`] instead.
+    ///
+    /// [`BuildHasher`]: core::hash::BuildHasher
+    #[derive(Debug, Clone, PartialEq, Eq, Default)]
+    pub struct FixedState<const BFAST: bool> {
+        per_hasher_seed: u64,
+    }
+
+    impl<const BFAST: bool> FixedState<BFAST> {
+        /// Creates a `FixedState` with the given per-hasher seed.
+        pub const fn new(seed: u64) -> Self {
+            Self { per_hasher_seed: seed }
+        }
+    }
+
+    impl<const BFAST: bool> core::hash::BuildHasher for FixedState<BFAST> {
+        type Hasher = IncrementalHasher<BFAST>;
+
+        fn build_hasher(&self) -> Self::Hasher {
+            Self::Hasher::new(self.per_hasher_seed)
+        }
+    }
+
     /// An incremental [`hasher`](core::hash::Hasher) instance that uses the MuseAir hashing algorithm.
     ///
-    /// Note that due to the nature of the algorithm, incrementally hashing small keys may be
-    /// significantly slower than one-shot functions that hash an entire key at once.
+    /// Note that incrementally hashing small keys will be significantly slower than one-shot hashing.
     ///
     /// For better hashmap performance on small keys and enhanced HashDoS resistance,
     /// consider using [`musemap`](https://crates.io/crates/musemap).
