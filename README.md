@@ -8,11 +8,11 @@
 
 <p align="right"><sup><b><i>English</i></b> 丨 <a href="README.zh-Hans.md">简体中文</a></sup></p>
 
-MuseAir is **a portable hashing algorithm** that heavily optimized for [performance](#benchmarks) and [quality](#quality), incorporating structures never before implemented. It offers two variants: `Standard` and `BFast`. The latter is faster but slightly *lower* in quality. For detailed differences, refer to the [algorithm analysis](#algorithm-analysis) below.
+MuseAir is **a portable hash function** that heavily optimized for [performance](#benchmarks) and [quality](#quality), featuring novel, high-efficiency structures. It offers two variants: `Standard` and `BFast`. The latter is faster but slightly *lower* in quality. For detailed differences, refer to the [algorithm analysis](#algorithm-analysis) below.
 
-MuseAir is **not designed for cryptographic security** and should not be used for security-critical purposes like protection against malicious tampering. For such cases, consider SHA-3, Ascon, or Blake3 instead.
+MuseAir is **not designed for cryptographic security** and must not be used for security-critical tasks like protection against malicious tampering. For such use cases, consider using SHA-3, Ascon, or Blake3.
 
-MuseAir is **currently unstable** and its output may change between minor versions. Therefore, it is not yet recommended for persistent formats.
+MuseAir is **currently unstable** and its output may change between minor versions. As such, it is not recommended for use in persistent formats at this time.
 
 
 
@@ -44,9 +44,11 @@ Only simple charts are provided for now. If you'd like more detailed comparisons
 
 ## Quality
 
-All MuseAir variants have passed the complete [SMHasher3](https://gitlab.com/fwojcik/smhasher3) extended test suite (with `--extra` flag). As the de facto standard for non-cryptographic hashing quality, passing these tests confirms production readiness. See full results in the [results](results) directory.
+All MuseAir variants have passed the complete [SMHasher3](https://gitlab.com/fwojcik/smhasher3) extended test suite (with `--extra` flag). As the de facto standard for evaluating non-cryptographic hash functions, passing these tests confirms production readiness. Full test logs can be found in the [results](results) directory.
 
-> *Since the core algorithm's quality has been verified with no major changes expected, only BFast_64-bit test results are provided after version 0.4.*
+> *As the core algorithm's quality has been verified and no major changes have been introduced since version 0.4, only the `BFast_64-bit` results are updated for subsequent releases.*
+
+For a more in-depth quality assessment, please refer to the [algorithm analysis](#algorithm-analysis).
 
 
 
@@ -56,8 +58,8 @@ This repository provides the official Rust implementation, available on [crates.
 
 #### Third-party
 
-| Language | Link | Note
-|:-------- |:---- |:----
+| Language | Repository | Note
+|:-------- |:---------- |:----
 | **C**    | [eternal-io/museair-c](https://github.com/eternal-io/museair-c) | *Abandoned, new implementations welcome*
 | **C++**  | [Twilight-Dream-Of-Magic/museair-cpp](https://github.com/Twilight-Dream-Of-Magic/museair-cpp)
 
@@ -67,41 +69,41 @@ This repository provides the official Rust implementation, available on [crates.
 
 ### TL;DR
 
-- Even the slightly *lower*-quality `BFast` variant offers better quality than other competitors while delivering the best performance -- this is the reason you should use MuseAir.
-- The higher-quality `Standard` variant is entirely immune to blinding multiplication while maintaining excellent performance, making it suitable for persistent file formats or communication protocols (though note the algorithm is not yet stable).
+- Even the slightly *lower*-quality `BFast` variant offers superior quality over its competitors while delivering top-tier performance&mdash;this is the definitive reason to choose MuseAir.
+- The higher-quality `Standard` variant is entirely immune to blinding multiplication while maintaining excellent performance, making it ideal for persistent file formats or communication protocols (though note the algorithm is not yet stable).
 
-### Handling small keys
+### Processing small keys
 
-The [chart](#small-keys) shows MuseAir's significant speed advantage for 16-32 byte keys. This is due to its resolution of _data hazards_: processing bytes 16-32 doesn't wait for bytes 0-16, effectively utilizing pipelining to reduce latency.
+The [chart](#hashing-small-keys) shows MuseAir's significant speed advantage for 16-32 byte keys. This is due to its resolution of _data hazards_: processing bytes 16-32 doesn't depend on the bytes 0-16, effectively leveraging CPU pipelining to hide latency.
 
-### Handling bulk datas
+### Processing bulk datas
 
 MuseAir's core step relies on *wide multiplication* (64-bit × 64-bit → 128-bit).
 
-From a computational perspective, multiplication can be decomposed into shifts and additions, giving it inherent confusion and diffusion properties. On most modern processors, multiplication requires just one instruction. Compared to manually combining other operations, wide multiplication offers significant advantages in performance and implementation complexity. Thus, many recent non-crypto hashing algorithms (e.g., [wyhash], [rapidhash], [komihash]) rely on it.
+From a computational perspective, multiplication can be decomposed into shifts and additions, giving it inherent confusion and diffusion properties. On most modern processors, multiplication is a single-instruction operation. Compared to manually combining multiple bitwise operations, wide multiplication offers significant advantages in performance and implementation complexity. Thus, many recent non-crypto hash functions (e.g., [wyhash], [rapidhash], [komihash]) rely on this primitive.
 
-The core steps of wyhash and rapidhash look like this: in a loop, large inputs are split into lanes...
+The core steps of `wyhash` and `rapidhash` look like this: in a loop, large inputs are split into lanes...
 
 ```rust
-lane0 = fold_mul( lane0 ^ input[0], CONSTANT[0] ^ input[1] );
-lane1 = fold_mul( lane1 ^ input[2], CONSTANT[1] ^ input[3] );
-lane2 = fold_mul( lane2 ^ input[4], CONSTANT[2] ^ input[5] );
+lane0 = fold_mul( input[0] ^ lane0, input[1] ^ CONSTANT[0] );
+lane1 = fold_mul( input[2] ^ lane1, input[3] ^ CONSTANT[1] );
+lane2 = fold_mul( input[4] ^ lane2, input[5] ^ CONSTANT[2] );
 // ...more lanes possible...
 ```
 
-Here, `fold_mul` is a *folding multiplication*: it performs a wide multiplication and XORs the high and low 64 bits of the result. `CONSTANT` is a set of magic constants to add entropy to the state.
+Here, `fold_mul` is a *folding multiplication*: it performs a 128-bit wide multiplication and returns the XOR of its upper and lower 64-bit halves. `CONSTANT` is a set of magic constants to add entropy to the state.
 
-At first glance, this seems fine. Wide multiplication ensures full diffusion within each lane, and splitting inputs into lanes enables instruction-level parallelism. Right?
+At first glance, this seems fine. Wide multiplication ensures full diffusion within each lane, and splitting inputs into lanes enables instruction-level parallelism (ILP). Right?
 
-If only it were that simple. We must consider all scenarios, especially those related to multiplication's fundamental properties. In the example above, what if `CONSTANT[0] ^ input[1] == 0`? Boom! A puff of magic smoke later, `lane0` becomes zero. All information in that lane is lost, and prior inputs in the lane won't affect the final result! This is known as *blinding multiplication*. Adding more lanes doesn't help, as all lanes are susceptible.
+If only it were that simple. We must consider all scenarios, especially those related to multiplication's fundamental properties. In the example above, what if `input[1] ^ CONSTANT[0] == 0`? Boom! A puff of magic smoke later, `lane0` becomes zero. All information in that lane is lost, and prior inputs in the lane won't affect the final result! This is known as *blinding multiplication*. Adding more lanes doesn't help, as all lanes are susceptible.
 
 > We shouldn't forget that "*zero times anything equals zero*!"
 
-From this perspective, if `CONSTANT` must be public, even CRCs (cyclic redundancy checks) offer better security properties -- though they are all non-cryptographic. If you're designing a persistent file format or communication protocol and want a simple checksum, you wouldn't want to use wyhash or rapidhash -- they're *too easy* to break for such uses! Providing *a fast hashing algorithm without these glaring issues* was MuseAir's design motivation.
+From this perspective, if `CONSTANT`s must be public, even CRCs (cyclic redundancy checks) offer better security properties (though they are all non-cryptographic). If you're designing a persistent file format or communication protocol and want a simple checksum, you wouldn't want to use `wyhash` or `rapidhash`&mdash;they're *too easy* to break for such uses! Providing *a fast hash function without these glaring issues* was MuseAir's design motivation.
 
 ---
 
-To address these problems, MuseAir introduces the **Ring Accumulator Group** structure:
+To address these problems, MuseAir introduces the **Circular Accumulator Array**:
 
 ```rust
 state[0] ^= input[0];
@@ -127,16 +129,33 @@ state[0] ^= input[11];
 state[5] = lo4 ^ hi5;
 ```
 
-This is the accumulator group for the `BFast` variant. Here, `wide_mul` performs a 128-bit wide multiplication, returning a tuple of the low and high 64 bits. Since there's no direct mixing with constants, both the probability and impact of blinding multiplication are dramatically reduced. Even with crafted inputs, typically only the most recent 8 bytes might not affect the output -- unlike wyhash or rapidhash, where a third of prior inputs can easily be made irrelevant!
+This is the accumulator array for the `BFast` variant. Here, `wide_mul` performs a 128-bit wide multiplication and returns a tuple containing the lower and upper 64-bit results, respectively.
 
-The `Standard` variant replaces all `=` with `+=`, making it entirely immune to blinding multiplication.
+1. Inputs are **not split into multiple independent lanes**, leading to superior diffusion: Every bit of input eventually influences all accumulators. Unlike `wyhash` or `rapidhash`, where an input bit can only affect at most one-third of the accumulators.
 
-Additionally, since inputs aren't split into lanes, MuseAir offers better diffusion: every input bit may eventually affect the entire state, unlike wyhash or rapidhash, where inputs affect at most a third of the state.
+2. Inputs are **not directly mixed with constants or seeds**, which significantly heightens the difficulty of intentionally crafting a blinding multiplication: Even if the seed and constants are public, an attacker must track how all previous inputs have acted upon the accumulator array. Unlike `wyhash` or `rapidhash`, which are fragile under such scrutiny.
 
-Thus, combining [performance](#performance), we conclude:
+Because earlier inputs have already permeated other accumulators in the array, even if a blinding multiplication occurs, in most cases it only results in the **most recent 8 bytes** failing to affect the output. Unlike `wyhash` or `rapidhash`, where a blinding multiplication can easily cause the **past one-third** of the total input to fail to affect the output!
 
-- Even the slightly *lower*-quality `BFast` variant offers better quality than other competitors while delivering the best performance -- this is the reason you should use MuseAir.
-- The higher-quality `Standard` variant is entirely immune to blinding multiplication while maintaining excellent performance, making it suitable for persistent file formats or communication protocols (though note the algorithm is not yet stable).
+3. This structure interleaves the multiplication results. Thus, for general inputs, the probability of a blinding multiplication leading to an accumulator reset (zeroing out) is only $2^{-127}$, far lower than the $2^{-63}$ found in `wyhash` or `rapidhash`. The reasoning is as follows:
+
+  - For general inputs, each `input[N]` can be treated as an independent random variable with $2^{64}$ possible states.
+  - In `wyhash` or `rapidhash`, when `input[0] == lane0` OR `input[1] == CONSTANT[0]`, both inputs fail to influence the final output. The probability of this occurring is $2^{-64} \times 2 = 2^{-63}$. Following this:
+    - `lane0` immediately collapses to zero. Due to the lack of inter-lane diffusion, this causes the past one-third of the total input to lose its influence on the output.
+  - In the `BFast` variant, `input[0]` fails to influence the output only when `input[1] == state[1]`, with a probability of $2^{-64}$. However:
+    - `state[0]` is highly unlikely to collapse to zero, thanks to the lagged mixing of multiplication results.
+    - For `state[0]` to zero out, `lo5` must also be zero. This requires the previous step to have also encountered a blinding multiplication (where `input[-2] == state[5]` OR `input[-1] == state[0]`), which has a probability of $2^{-63}$.
+    - Thus, the cumulative probability of `state[0]` zeroing out is $2^{-64} \times 2^{-63} = 2^{-127}$.
+    - Even in such an event, the impact is localized because earlier inputs have already permeated other accumulators in the array.
+
+4. This structure is designed to be highly conducive to instruction-level parallelism (ILP). Throughput should reach the theoretical limits of modern processors (pure scalar, performing 1 multiplication and 3 XORs per 16 bytes).
+
+Finally, the `Standard` variant simply replaces all `=` operators in the accumulator array with `+=`, completely immunizing the algorithm against blinding multiplication at a minimal performance cost.
+
+Combined with the [benchmarks](#benchmarks), we arrive at the following conclusion:
+
+- Even the slightly *lower*-quality `BFast` variant offers superior quality over its competitors while delivering top-tier performance&mdash;this is the definitive reason to choose MuseAir.
+- The higher-quality `Standard` variant is entirely immune to blinding multiplication while maintaining excellent performance, making it ideal for persistent file formats or communication protocols (though note the algorithm is not yet stable).
 
 
 
