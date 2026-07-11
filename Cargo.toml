@@ -1,11 +1,11 @@
 [package]
 name = "museair"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
-rust-version = "1.83.0"
+rust-version = "1.77.0"
 authors = ["K--Aethiax"]
 
-description = "A portable hashing algorithm that heavily optimized for performance and quality, incorporating structures never before implemented."
+description = "The top-performing portable hashing algorithm to date."
 
 documentation = "https://docs.rs/museair"
 repository = "https://github.com/eternal-io/museair"
@@ -15,7 +15,7 @@ readme = "CRATES.IO-README.md"
 keywords = ["hash", "hasher", "museair", "wyhash", "rapidhash"]
 categories = ["algorithms", "no-std"]
 
-include = ["src/**"]
+include = ["**/*.rs", "/*.md"]
 
 
 [package.metadata.docs.rs]
@@ -30,14 +30,13 @@ std = []
 
 [dev-dependencies]
 hashverify = "0.1.0"
-criterion = "0.5.1"
-komihash = "0.4.1"
-wyhash-final4 = "0.2.2"
-rapidhash = "1.4.0"
-
-
-[workspace]
-members = ["show-asm"]
+criterion = "0.8.2"
+rapidhash = "4.4.1"
+wyhash-final4 = "=0.2.2"
+komihash = "=0.4.1"
+seahash = "4.1.0"
+twox-hash = { version = "2.1.2", default-features = false, features = ["xxhash64"] }
+fxhash = "0.2.1"
 
 
 [[bench]]

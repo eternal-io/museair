@@ -1,5 +1,9 @@
 /target
 Cargo.lock
 
+/results/.venv
+/results/uv.lock
+/results/pyproject.toml
+
 # ignore temporary files.
-/_*
+/__*
