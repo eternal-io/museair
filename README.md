@@ -1,5 +1,11 @@
 # <img src="MuseAir-icon-light.png" style="height:1em" /> MuseAir Hash
 
+> [!CAUTION]
+> 
+> Algorithm version **v1** has a serious flaw (see [#3](https://github.com/eternal-io/museair/issues/3) for details), so please don't use it for the time being.
+> 
+> I will fix it soon and release version **v1a**.
+
 MuseAir is the top-performing portable hashing algorithm to date.
 
 - **Improved quality** -
