@@ -1,5 +1,5 @@
 /*
- * MuseAir v1
+ * MuseAir v1a
  * By K--Aethiax
  *
  * Released into the public domain under the CC0 1.0 license. To view a copy
@@ -60,12 +60,12 @@ static FORCE_INLINE void museair_hash_short(const uint8_t* bytes,
     museair_read_short<bswap>(bytes, len <= 16 ? len : 16, &i, &j);
 
     if (b128) {
-        MathMult::mult64_128(lo0, hi0, CONSTANT[0] + seed_a + len, CONSTANT[1] ^ len);
-        MathMult::mult64_128(lo1, hi1, CONSTANT[2] - seed_b - len, CONSTANT[3] ^ len);
+        MathMult::mult64_128(lo0, hi0, (CONSTANT[0] + seed_a) ^ len, CONSTANT[1] ^ len);
+        MathMult::mult64_128(lo1, hi1, (CONSTANT[2] - seed_b) ^ len, CONSTANT[3] ^ len);
         i ^= lo0 ^ hi1;
         j ^= lo1 ^ hi0;
     } else {
-        MathMult::mult64_128(lo2, hi2, CONSTANT[2] ^ seed_a ^ len, CONSTANT[3] ^ len);
+        MathMult::mult64_128(lo2, hi2, (CONSTANT[2] ^ seed_a) ^ len, CONSTANT[3] ^ len);
         i ^= lo2;
         j ^= hi2;
     }
@@ -73,8 +73,13 @@ static FORCE_INLINE void museair_hash_short(const uint8_t* bytes,
     if (unlikely(len > u64x(2))) {
         uint64_t u, v;
         museair_read_short<bswap>(bytes + u64x(2), len - u64x(2), &u, &v);
-        MathMult::mult64_128(lo0, hi0, CONSTANT[4] ^ u, CONSTANT[5]);
-        MathMult::mult64_128(lo1, hi1, CONSTANT[6] ^ v, CONSTANT[7]);
+        if (b128) {
+            MathMult::mult64_128(lo0, hi0, (CONSTANT[4] + seed_a) ^ u, CONSTANT[5]);
+            MathMult::mult64_128(lo1, hi1, (CONSTANT[6] - seed_b) ^ v, CONSTANT[7]);
+        } else {
+            MathMult::mult64_128(lo0, hi0, (CONSTANT[4] ^ seed_a) ^ u, CONSTANT[5]);
+            MathMult::mult64_128(lo1, hi1, (CONSTANT[6] ^ seed_a) ^ v, CONSTANT[7]);
+        }
         i ^= lo0 ^ hi1;
         j ^= lo1 ^ hi0;
     }
@@ -272,9 +277,9 @@ static NEVER_INLINE void museair_hash_loong(const uint8_t* bytes,
     MathMult::mult64_128(lo2, hi2, k, i);
 
     if (!bfast) {
-        i ^= lo0 ^ hi2;
-        j ^= lo1 ^ hi0;
-        k ^= lo2 ^ hi1;
+        i -= lo0 ^ hi2;
+        j -= lo1 ^ hi0;
+        k -= lo2 ^ hi1;
     } else {
         i = lo2 ^ hi0;
         j = lo0 ^ hi1;
@@ -342,7 +347,7 @@ REGISTER_FAMILY(MuseAir,
 );
 
 REGISTER_HASH(MuseAir,
-    $.desc       = "MuseAir v1, 64-bit version",
+    $.desc       = "MuseAir v1a, 64-bit version",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -350,12 +355,12 @@ REGISTER_HASH(MuseAir,
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0xFB919A7D,
+    $.verification_LE = 0x7140CABC,
     $.hashfn_native   = MuseAirHash<false, false, false>,
     $.hashfn_bswap    = MuseAirHash<true, false, false>
 );
 REGISTER_HASH(MuseAir__folded,
-    $.desc       = "MuseAir v1, 64-bit version, XOR-folded down to 32-bit",
+    $.desc       = "MuseAir v1a, 64-bit version, XOR-folded down to 32-bit",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -363,12 +368,12 @@ REGISTER_HASH(MuseAir__folded,
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 32,
-    $.verification_LE = 0x7F558188,
+    $.verification_LE = 0x0B8F0243,
     $.hashfn_native   = MuseAirHashFolded<false, false>,
     $.hashfn_bswap    = MuseAirHashFolded<true, false>
 );
 REGISTER_HASH(MuseAir_128,
-    $.desc       = "MuseAir v1, 128-bit version",
+    $.desc       = "MuseAir v1a, 128-bit version",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -376,12 +381,12 @@ REGISTER_HASH(MuseAir_128,
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x4041FF27,
+    $.verification_LE = 0x38028C88,
     $.hashfn_native   = MuseAirHash<false, false, true>,
     $.hashfn_bswap    = MuseAirHash<true, false, true>
 );
 REGISTER_HASH(MuseAir_128__folded,
-    $.desc       = "MuseAir v1, 128-bit version, ADD-folded down to 64-bit",
+    $.desc       = "MuseAir v1a, 128-bit version, ADD-folded down to 64-bit",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -389,13 +394,13 @@ REGISTER_HASH(MuseAir_128__folded,
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0xD5B53A4E,
+    $.verification_LE = 0xB9CD57B7,
     $.hashfn_native   = MuseAirHash128Folded<false, false>,
     $.hashfn_bswap    = MuseAirHash128Folded<true, false>
 );
 
 REGISTER_HASH(MuseAir_BFast,
-    $.desc       = "MuseAir v1, BFast variant, 64-bit version",
+    $.desc       = "MuseAir v1a, BFast variant, 64-bit version",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -403,12 +408,12 @@ REGISTER_HASH(MuseAir_BFast,
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x79B92E70,
+    $.verification_LE = 0xA4BFD093,
     $.hashfn_native   = MuseAirHash<false, true, false>,
     $.hashfn_bswap    = MuseAirHash<true, true, false>
 );
 REGISTER_HASH(MuseAir_BFast__folded,
-    $.desc       = "MuseAir v1, BFast variant, 64-bit version, XOR-folded down to 32-bit",
+    $.desc       = "MuseAir v1a, BFast variant, 64-bit version, XOR-folded down to 32-bit",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -416,12 +421,12 @@ REGISTER_HASH(MuseAir_BFast__folded,
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 32,
-    $.verification_LE = 0xF3B0F5C2,
+    $.verification_LE = 0xDCCDD53A,
     $.hashfn_native   = MuseAirHashFolded<false, true>,
     $.hashfn_bswap    = MuseAirHashFolded<true, true>
 );
 REGISTER_HASH(MuseAir_BFast_128,
-    $.desc       = "MuseAir v1, BFast variant, 128-bit version",
+    $.desc       = "MuseAir v1a, BFast variant, 128-bit version",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -429,12 +434,12 @@ REGISTER_HASH(MuseAir_BFast_128,
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 128,
-    $.verification_LE = 0x0B4953E9,
+    $.verification_LE = 0x81863E77,
     $.hashfn_native   = MuseAirHash<false, true, true>,
     $.hashfn_bswap    = MuseAirHash<true, true, true>
 );
 REGISTER_HASH(MuseAir_BFast_128__folded,
-    $.desc       = "MuseAir v1, BFast variant, 128-bit version, ADD-folded down to 64-bit",
+    $.desc       = "MuseAir v1a, BFast variant, 128-bit version, ADD-folded down to 64-bit",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -442,7 +447,7 @@ REGISTER_HASH(MuseAir_BFast_128__folded,
                  | FLAG_IMPL_ROTATE_VARIABLE
                  | FLAG_IMPL_LICENSE_PUBLIC_DOMAIN,
     $.bits = 64,
-    $.verification_LE = 0x14474887,
+    $.verification_LE = 0x9BAAAF63,
     $.hashfn_native   = MuseAirHash128Folded<false, true>,
     $.hashfn_bswap    = MuseAirHash128Folded<true, true>
 );
