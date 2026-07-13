@@ -1,5 +1,5 @@
 /*
- * MuseAir v1a
+ * MuseAir v2
  * By K--Aethiax
  *
  * Released into the public domain under the CC0 1.0 license. To view a copy
@@ -347,7 +347,7 @@ REGISTER_FAMILY(MuseAir,
 );
 
 REGISTER_HASH(MuseAir,
-    $.desc       = "MuseAir v1a, 64-bit version",
+    $.desc       = "MuseAir v2, 64-bit version",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -360,7 +360,7 @@ REGISTER_HASH(MuseAir,
     $.hashfn_bswap    = MuseAirHash<true, false, false>
 );
 REGISTER_HASH(MuseAir__folded,
-    $.desc       = "MuseAir v1a, 64-bit version, XOR-folded down to 32-bit",
+    $.desc       = "MuseAir v2, 64-bit version, XOR-folded down to 32-bit",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -373,7 +373,7 @@ REGISTER_HASH(MuseAir__folded,
     $.hashfn_bswap    = MuseAirHashFolded<true, false>
 );
 REGISTER_HASH(MuseAir_128,
-    $.desc       = "MuseAir v1a, 128-bit version",
+    $.desc       = "MuseAir v2, 128-bit version",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -386,7 +386,7 @@ REGISTER_HASH(MuseAir_128,
     $.hashfn_bswap    = MuseAirHash<true, false, true>
 );
 REGISTER_HASH(MuseAir_128__folded,
-    $.desc       = "MuseAir v1a, 128-bit version, ADD-folded down to 64-bit",
+    $.desc       = "MuseAir v2, 128-bit version, ADD-folded down to 64-bit",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -400,7 +400,7 @@ REGISTER_HASH(MuseAir_128__folded,
 );
 
 REGISTER_HASH(MuseAir_BFast,
-    $.desc       = "MuseAir v1a, BFast variant, 64-bit version",
+    $.desc       = "MuseAir v2, BFast variant, 64-bit version",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -413,7 +413,7 @@ REGISTER_HASH(MuseAir_BFast,
     $.hashfn_bswap    = MuseAirHash<true, true, false>
 );
 REGISTER_HASH(MuseAir_BFast__folded,
-    $.desc       = "MuseAir v1a, BFast variant, 64-bit version, XOR-folded down to 32-bit",
+    $.desc       = "MuseAir v2, BFast variant, 64-bit version, XOR-folded down to 32-bit",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -426,7 +426,7 @@ REGISTER_HASH(MuseAir_BFast__folded,
     $.hashfn_bswap    = MuseAirHashFolded<true, true>
 );
 REGISTER_HASH(MuseAir_BFast_128,
-    $.desc       = "MuseAir v1a, BFast variant, 128-bit version",
+    $.desc       = "MuseAir v2, BFast variant, 128-bit version",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE
@@ -439,7 +439,7 @@ REGISTER_HASH(MuseAir_BFast_128,
     $.hashfn_bswap    = MuseAirHash<true, true, true>
 );
 REGISTER_HASH(MuseAir_BFast_128__folded,
-    $.desc       = "MuseAir v1a, BFast variant, 128-bit version, ADD-folded down to 64-bit",
+    $.desc       = "MuseAir v2, BFast variant, 128-bit version, ADD-folded down to 64-bit",
     $.impl       = "portable",
     $.hash_flags = FLAG_HASH_ENDIAN_INDEPENDENT,
     $.impl_flags = FLAG_IMPL_CANONICAL_LE

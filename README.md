@@ -1,11 +1,5 @@
 # <img src="MuseAir-icon-light.png" style="height:1em" /> MuseAir Hash
 
-> [!CAUTION]
-> 
-> Algorithm version **v1** has a serious flaw (see [#3](https://github.com/eternal-io/museair/issues/3) for details), so please don't use it for the time being.
-> 
-> I will fix it soon and release version **v1a**.
-
 MuseAir is the top-performing portable hashing algorithm to date.
 
 - **Improved quality** -
@@ -22,7 +16,7 @@ MuseAir is the top-performing portable hashing algorithm to date.
 
 MuseAir is **not designed for cryptographic security** and must not be used for security-critical purposes, such as protecting against malicious tampering. For such cases, consider using KangarooTwelve (K12), BLAKE3, or Ascon.
 
-The latest stable version of the algorithm is **v1**. For stable versions, the hash output is guaranteed not to change.
+The only functional and stable version of the algorithm is **v2**. See also the [changelog](CHANGELOG.md) for details.
 
 The full SMHasher3 test results are in the [results](results) directory.
 
@@ -41,7 +35,7 @@ If unspecified, the default is the *Standard* variant.
 
     In summary, when the seed/secret is public, constructing a blinding multiplication against MuseAir-BFast
     for long inputs requires a different sequence per prefix and only corrupts the most recent 8 bytes,
-    whereas for [wyhash] and [rapidhash] (without `protected` mode), a fixed sequence works for any prefix
+    whereas for wyhash and rapidhash (without `protected` mode), a fixed sequence works for any prefix
     and corrupts a moderate portion of past bytes.
     See the [algorithm analysis](#algorithm-analysis) below for details.
 
@@ -80,31 +74,33 @@ fn hash128_folded(bytes: &[u8], seed_a: u64, seed_b: u64) -> u64;
 Benchmarks conducted on AMD Ryzen 7 5700G desktop, with frequency locked at 4.0 GHz.
 
 <p align="center">
-<img width="90%" src="results/bench-bulkdata.png" alt="Throughput for bulk data" /></p>
+<img width="100%" src="results/bench-bulkdata.png" alt="Throughput for bulk data" /></p>
 
 <p align="center">
-<img width="80%" src="results/bench-smallkeys.png" alt="Latency for small keys" /></p>
+<img width="90%" src="results/bench-smallkeys.png" alt="Latency for small keys" /></p>
 
 
 ## Ports
 
-This repository provides the official Rust implementation, available on [crates.io](https://crates.io/crates/museair), or straight to [docs.rs](https://docs.rs/museair/latest/museair/).
+This repository provides the official Rust implementation, available on [crates.io](https://crates.io/crates/museair) or straight to [docs.rs](https://docs.rs/museair/latest/museair/).
+
+If you have ported MuseAir to another language and would like to link to your repository here, please open an issue and include the information and link.
 
 <details><summary><i>Implementation notes</i></summary>
 
-- Please note endianness.
-- Use [verification codes](https://gitlab.com/fwojcik/smhasher3/-/blob/6ab4343396fbe0f7a1c7ac4f01d0eb9acffe4202/misc/hashverify.c) to ensure the same hashes are implemented; this avoids the need for lengthy test vectors.
+- Please note the endianness; all inputs are read in little-endian.
+- Use [verification codes](https://gitlab.com/fwojcik/smhasher3/-/blob/6ab4343396fbe0f7a1c7ac4f01d0eb9acffe4202/misc/hashverify.c) to ensure that the same hashes are implemented; this avoids the need for lengthy test vectors.
     ```c
-    0xFB919A7D, // MuseAir
-    0x7F558188, // MuseAir.folded
-    0x4041FF27, // MuseAir-128
-    0xD5B53A4E, // MuseAir-128.folded
-    0x79B92E70, // MuseAir-BFast
-    0xF3B0F5C2, // MuseAir-BFast.folded
-    0x0B4953E9, // MuseAir-BFast-128
-    0x14474887, // MuseAir-BFast-128.folded
+    0x7140CABC, // MuseAir
+    0x0B8F0243, // MuseAir.folded
+    0x38028C88, // MuseAir-128
+    0xB9CD57B7, // MuseAir-128.folded
+    0xA4BFD093, // MuseAir-BFast
+    0xDCCDD53A, // MuseAir-BFast.folded
+    0x81863E77, // MuseAir-BFast-128
+    0x9BAAAF63, // MuseAir-BFast-128.folded
     ```
-- For the *BFast* variant, loop unrolling helps achieve peak throughput; as for the *Standard* variant, this does not appear to be necessary.
+- For the *BFast* variant, loop unrolling helps achieve the peak throughput; as for the *Standard* variant, this appears unnecessary.
 
 </details>
 
@@ -217,7 +213,7 @@ completely immunizing the algorithm against blinding multiplication at minimal p
 
 ## License
 
-The MuseAir hashing algorithm itself and its reference implementation [`museair.cpp`](museair.cpp),
+The MuseAir hashing algorithm itself and its reference implementation [`museair.cpp`](museair.cpp)
 are released into the public domain under CC0 1.0.
 
 All other code in this repository is dual-licensed under MIT and Apache 2.0, at your option.

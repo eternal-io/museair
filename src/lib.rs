@@ -5,41 +5,41 @@
 #![doc(html_logo_url = "https://github.com/eternal-io/museair/blob/master/MuseAir-icon-light.png?raw=true")]
 #![warn(missing_docs)]
 
-/// Computes the 64-bit MuseAir v1a hash for a byte slice. *(standard variant)*
+/// Computes the 64-bit MuseAir v2 hash for a byte slice. *(standard variant)*
 #[inline]
 pub const fn hash(bytes: &[u8], seed: u64) -> u64 {
     impls::hash::<false, false>(bytes, seed)
 }
 
-/// Computes a 32-bit MuseAir v1a hash for a byte slice, by XOR-folding the underlying 64-bit result. *(standard variant)*
+/// Computes a 32-bit MuseAir v2 hash for a byte slice, by XOR-folding the underlying 64-bit result. *(standard variant)*
 #[inline]
 pub const fn hash_folded(bytes: &[u8], seed: u64) -> u32 {
     impls::hash_folded::<false, false>(bytes, seed)
 }
 
-/// Computes the 128-bit MuseAir v1a hash for a byte slice. *(standard variant)*
+/// Computes the 128-bit MuseAir v2 hash for a byte slice. *(standard variant)*
 #[inline]
 pub const fn hash128(bytes: &[u8], seed_a: u64, seed_b: u64) -> u128 {
     impls::hash128::<false, false>(bytes, seed_a, seed_b)
 }
 
-/// Computes a 64-bit MuseAir v1a hash for a byte slice, by ADD-folding the underlying 128-bit result. *(standard variant)*
+/// Computes a 64-bit MuseAir v2 hash for a byte slice, by ADD-folding the underlying 128-bit result. *(standard variant)*
 #[inline]
 pub const fn hash128_folded(bytes: &[u8], seed_a: u64, seed_b: u64) -> u64 {
     impls::hash128_folded::<false, false>(bytes, seed_a, seed_b)
 }
 
-/// A 64-bit MuseAir v1a incremental hasher. *(standard variant)*
+/// A 64-bit MuseAir v2 incremental hasher. *(standard variant)*
 ///
 /// See [the crate level documentation](crate#incremental-hasher) for more.
 pub type Hasher = impls::IncrementalHasher<false>;
 
-/// A 128-bit MuseAir v1a incremental hasher. *(standard variant)*
+/// A 128-bit MuseAir v2 incremental hasher. *(standard variant)*
 ///
 /// See [the crate level documentation](crate#incremental-hasher) for more.
 pub type Hasher128 = impls::IncrementalHasher128<false>;
 
-/// A common MuseAir v1a incremental hasher with fixed seed 0. *(standard variant)*
+/// A common MuseAir v2 incremental hasher with fixed seed 0. *(standard variant)*
 ///
 /// This supports both 64-bit (non-folded) and 128-bit hash outputs.
 ///
@@ -70,41 +70,41 @@ pub type CommonHasher = impls::CommonIncrementalHasher<false>;
 pub mod bfast {
     use super::*;
 
-    /// Computes the 64-bit MuseAir v1a hash for a byte slice. *(BFast variant)*
+    /// Computes the 64-bit MuseAir v2 hash for a byte slice. *(BFast variant)*
     #[inline]
     pub const fn hash(bytes: &[u8], seed: u64) -> u64 {
         impls::hash::<true, true>(bytes, seed)
     }
 
-    /// Computes a 32-bit MuseAir v1a hash for a byte slice, by XOR-folding the underlying 64-bit result. *(BFast variant)*
+    /// Computes a 32-bit MuseAir v2 hash for a byte slice, by XOR-folding the underlying 64-bit result. *(BFast variant)*
     #[inline]
     pub const fn hash_folded(bytes: &[u8], seed: u64) -> u32 {
         impls::hash_folded::<true, true>(bytes, seed)
     }
 
-    /// Computes the 128-bit MuseAir v1a hash for a byte slice. *(BFast variant)*
+    /// Computes the 128-bit MuseAir v2 hash for a byte slice. *(BFast variant)*
     #[inline]
     pub const fn hash128(bytes: &[u8], seed_a: u64, seed_b: u64) -> u128 {
         impls::hash128::<true, true>(bytes, seed_a, seed_b)
     }
 
-    /// Computes a 64-bit MuseAir v1a hash for a byte slice, by ADD-folding the underlying 128-bit result. *(BFast variant)*
+    /// Computes a 64-bit MuseAir v2 hash for a byte slice, by ADD-folding the underlying 128-bit result. *(BFast variant)*
     #[inline]
     pub const fn hash128_folded(bytes: &[u8], seed_a: u64, seed_b: u64) -> u64 {
         impls::hash128_folded::<true, true>(bytes, seed_a, seed_b)
     }
 
-    /// A 64-bit MuseAir v1a incremental hasher. *(BFast variant)*
+    /// A 64-bit MuseAir v2 incremental hasher. *(BFast variant)*
     ///
     /// See [the crate level documentation](crate#incremental-hasher) for more.
     pub type Hasher = impls::IncrementalHasher<true>;
 
-    /// A 128-bit MuseAir v1a incremental hasher. *(BFast variant)*
+    /// A 128-bit MuseAir v2 incremental hasher. *(BFast variant)*
     ///
     /// See [the crate level documentation](crate#incremental-hasher) for more.
     pub type Hasher128 = impls::IncrementalHasher128<true>;
 
-    /// A common MuseAir v1a incremental hasher with fixed seed 0. *(BFast variant)*
+    /// A common MuseAir v2 incremental hasher with fixed seed 0. *(BFast variant)*
     ///
     /// This supports both 64-bit (non-folded) and 128-bit hash outputs.
     ///
@@ -557,7 +557,7 @@ const fn hash_loong_finalize<const BFAST: bool>(
 
 //------------------------------------------------------------------------------
 
-/// Implementation details of MuseAir v1a.
+/// Implementation details of MuseAir v2.
 ///
 /// Const generic parameters:
 ///
@@ -566,7 +566,7 @@ const fn hash_loong_finalize<const BFAST: bool>(
 pub mod impls {
     use super::*;
 
-    /// Computes the 64-bit MuseAir v1a hash for a byte slice.
+    /// Computes the 64-bit MuseAir v2 hash for a byte slice.
     ///
     /// For most use cases, prefer [`hash`](crate::hash) or [`bfast::hash`] instead.
     #[inline(always)]
@@ -578,7 +578,7 @@ pub mod impls {
         }
     }
 
-    /// Computes a 32-bit MuseAir v1a hash for a byte slice, by XOR-folding the underlying 64-bit result.
+    /// Computes a 32-bit MuseAir v2 hash for a byte slice, by XOR-folding the underlying 64-bit result.
     ///
     /// For most use cases, prefer [`hash_folded`](crate::hash_folded) or [`bfast::hash_folded`] instead.
     #[inline(always)]
@@ -586,7 +586,7 @@ pub mod impls {
         xor_fold(hash::<BFAST, UNROLL>(bytes, seed))
     }
 
-    /// Computes the 128-bit MuseAir v1a hash for a byte slice.
+    /// Computes the 128-bit MuseAir v2 hash for a byte slice.
     ///
     /// For most use cases, prefer [`hash128`](crate::hash128) or [`bfast::hash128`] instead.
     #[inline(always)]
@@ -598,7 +598,7 @@ pub mod impls {
         }
     }
 
-    /// Computes a 64-bit MuseAir v1a hash for a byte slice, by ADD-folding the underlying 128-bit result.
+    /// Computes a 64-bit MuseAir v2 hash for a byte slice, by ADD-folding the underlying 128-bit result.
     ///
     /// For most use cases, prefer [`hash128_folded`](crate::hash128_folded) or [`bfast::hash128_folded`] instead.
     #[inline(always)]
@@ -608,7 +608,7 @@ pub mod impls {
 
     //------------------------------------------------------------------------------
 
-    /// The 64-bit MuseAir v1a incremental hasher.
+    /// The 64-bit MuseAir v2 incremental hasher.
     ///
     /// For most use cases, prefer [`Hasher`] or [`bfast::Hasher`] instead.
     ///
@@ -618,7 +618,7 @@ pub mod impls {
         inner: IncrementalHasherState<false>,
     }
     impl<const BFAST: bool> IncrementalHasher<BFAST> {
-        /// Constructs a new, 64-bit MuseAir v1a incremental hasher.
+        /// Constructs a new, 64-bit MuseAir v2 incremental hasher.
         pub const fn with_seed(x: u64) -> Self {
             Self {
                 inner: IncrementalHasherState::with_seed64(x),
@@ -660,7 +660,7 @@ pub mod impls {
         }
     }
 
-    /// The 128-bit MuseAir v1a incremental hasher.
+    /// The 128-bit MuseAir v2 incremental hasher.
     ///
     /// For most use cases, prefer [`Hasher128`] or [`bfast::Hasher128`] instead.
     ///
@@ -670,7 +670,7 @@ pub mod impls {
         inner: IncrementalHasherState<true>,
     }
     impl<const BFAST: bool> IncrementalHasher128<BFAST> {
-        /// Constructs a new, 128-bit MuseAir v1a incremental hasher.
+        /// Constructs a new, 128-bit MuseAir v2 incremental hasher.
         pub const fn with_seed(a: u64, b: u64) -> Self {
             Self {
                 inner: IncrementalHasherState::with_seed128(a, b),
@@ -712,7 +712,7 @@ pub mod impls {
         }
     }
 
-    /// The common MuseAir v1a incremental hasher with fixed seed 0.
+    /// The common MuseAir v2 incremental hasher with fixed seed 0.
     ///
     /// This supports both 64-bit (non-folded) and 128-bit hash outputs.
     ///
@@ -724,7 +724,7 @@ pub mod impls {
         inner: IncrementalHasherState<false>,
     }
     impl<const BFAST: bool> CommonIncrementalHasher<BFAST> {
-        /// Constructs a new, common MuseAir v1a incremental hasher with fixed seed 0.
+        /// Constructs a new, common MuseAir v2 incremental hasher with fixed seed 0.
         pub const fn new() -> Self {
             Self {
                 inner: IncrementalHasherState::with_seed64(0),
@@ -1007,7 +1007,7 @@ mod verify {
     extern crate std;
 
     #[test]
-    fn stability_v1a() {
+    fn stability_v2() {
         let expected = vec![
             0x7140CABC, 0x0B8F0243, 0x38028C88, 0xB9CD57B7, 0xA4BFD093, 0xDCCDD53A, 0x81863E77, 0x9BAAAF63,
         ];

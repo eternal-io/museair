@@ -31,13 +31,6 @@ MuseAir is **not designed for cryptographic security** and must not be used for 
 [SMHasher3]: https://gitlab.com/fwojcik/smhasher3
 
 
-## Stability
-
-The currently stable version of the algorithm is **v1**.
-
-For stable versions of the algorithm, the hash output is guaranteed not to change with the crate version.
-
-
 ## Usage
 
 ```rust
@@ -70,13 +63,13 @@ This crate provides incremental hashers.
 
 However, incremental hashers are often slower in places where a [`Hasher`] is needed (e.g., [`HashMap`]), since the trait [`Hasher`] does not mandate incremental behavior, incremental hashers cannot take advantage of it to improve performance.
 
-If you simply want to replace the [`DefaultHasher`] (the much slower SipHash) or get a faster [`HashMap`], without needing a stable hash output, then you only need an in-memory hasher; consider using [ahash] or [foldhash], which are better suited for such cases.
+If you simply want to replace the [`DefaultHasher`] (the much slower SipHash) or get a faster [`HashMap`], without needing a stable hash output, then you only need an in-memory hasher; consider using [foldhash] or [ahash], which are better suited for such cases.
 
 [`Hasher`]: std::hash::Hasher
 [`HashMap`]: std::collections::HashMap
 [`DefaultHasher`]: std::collections::hash_map::DefaultHasher
-[ahash]: https://crates.io/crates/ahash
 [foldhash]: https://crates.io/crates/foldhash
+[ahash]: https://crates.io/crates/ahash
 
 
 ## Benchmarks
@@ -84,9 +77,9 @@ If you simply want to replace the [`DefaultHasher`] (the much slower SipHash) or
 Benchmarks conducted on AMD Ryzen 7 5700G desktop, with frequency locked at 4.0 GHz.
 
 <p align="center">
-<img width="90%" src="https://github.com/eternal-io/museair/blob/fd8a65772ae03824b17015bd5496f528458e43b3/results/bench-bulkdata.png?raw=true" alt="Throughput for bulk data" /></p>
+<img width="100%" src="https://github.com/eternal-io/museair/blob/9d51971e546cb6023140bf9a69903751b488654f/results/bench-bulkdata.png?raw=true" alt="Throughput for bulk data" /></p>
 <p align="center">
-<img width="80%" src="https://github.com/eternal-io/museair/blob/fd8a65772ae03824b17015bd5496f528458e43b3/results/bench-smallkeys.png?raw=true" alt="Latency for small keys" /></p>
+<img width="90%" src="https://github.com/eternal-io/museair/blob/9d51971e546cb6023140bf9a69903751b488654f/results/bench-smallkeys.png?raw=true" alt="Latency for small keys" /></p>
 
 
 ## Crate versioning
