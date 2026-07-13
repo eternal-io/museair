@@ -53,7 +53,7 @@ pub type CommonHasher = impls::CommonIncrementalHasher<false>;
 ///
 /// In summary, when the seed/secret is public, constructing a blinding multiplication against MuseAir-BFast
 /// for long inputs requires a different sequence per prefix and only corrupts the most recent 8 bytes,
-/// whereas for [wyhash] and [rapidhash] (without `protected` mode), a fixed sequence works for any prefix
+/// whereas for wyhash and rapidhash (without `protected` mode), a fixed sequence works for any prefix
 /// and corrupts a moderate portion of past bytes. See the [algorithm analysis] in the repository for details.
 ///
 /// Thus, in most cases where MuseAir-Standard is acceptable, MuseAir-BFast can be used to improve performance

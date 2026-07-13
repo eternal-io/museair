@@ -24,6 +24,11 @@ The issue was resolved by applying an additional avalanche step to the 128-bit v
 
 ## This crate
 
+### 0.6.0
+
+Switch the implemented algorithm to v2.
+
+
 ### Before 0.5.0
 
 For versions 0.4.0 and earlier of this crate, the incremental hasher implementation contained a critical bug.
