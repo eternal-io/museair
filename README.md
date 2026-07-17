@@ -6,7 +6,6 @@ MuseAir is the top-performing portable hashing algorithm to date.
   Not vulnerable to blinding multiplication attacks that hinder public use (which affect [wyhash] and [rapidhash]);
   passed all [SMHasher3] tests, the de facto non-crypto hash quality standard;
   ideal for checksums such as in communication protocols and persistent file formats.
-  See the [algorithm analysis](#algorithm-analysis) below for details.
 
 - **Blazing fast** - The fastest portable hashing algorithm not affected by such attacks.
 
@@ -16,9 +15,7 @@ MuseAir is the top-performing portable hashing algorithm to date.
 
 MuseAir is **not designed for cryptographic security** and must not be used for security-critical purposes, such as protecting against malicious tampering. For such cases, consider using KangarooTwelve (K12), BLAKE3, or Ascon.
 
-The only functional and stable version of the algorithm is **v2**. See also the [changelog](CHANGELOG.md) for details.
-
-The full SMHasher3 test results are in the [results](results) directory.
+The only stable and functional release of the algorithm is **v2**.
 
 
 ## Variants
@@ -28,7 +25,7 @@ If unspecified, the default is the *Standard* variant.
 
 - The *Standard* variant is completely immune to blinding multiplication and related attacks.
 
-- The *BFast* variant is faster than *Standard*, matching the speed of [wyhash] and [rapidhash].
+- The *BFast* variant is faster than *Standard*, matching the speed of wyhash and rapidhash.
   While those are susceptible to blinding multiplication, MuseAir-BFast is significantly less so.
 
     <details><summary><i>Details</i></summary>
@@ -80,6 +77,15 @@ Benchmarks conducted on AMD Ryzen 7 5700G desktop, with frequency locked at 4.0 
 <img width="90%" src="results/bench-smallkeys.png" alt="Latency for small keys" /></p>
 
 
+## Choose an appropriate hash
+
+To keep a simple interface, MuseAir relies solely on an initial seed, without any additional secret; this makes it unsuitable for direct use on servers—it is more susceptible than other hashes in such environments.
+
+Therefore, if you only need in-memory hashing, without needing a stable hash output:
+- If you are using Rust, [foldhash] and [ahash] are the best choices.
+- If you are using C/C++, wyhash and rapidhash remain good choices.
+
+
 ## Ports
 
 This repository provides the official Rust implementation, available on [crates.io](https://crates.io/crates/museair) or straight to [docs.rs](https://docs.rs/museair/latest/museair/).
@@ -89,7 +95,7 @@ If you have ported MuseAir to another language and would like to link to your re
 <details><summary><i>Implementation notes</i></summary>
 
 - Please note the endianness; all inputs are read in little-endian.
-- Use [verification codes](https://gitlab.com/fwojcik/smhasher3/-/blob/6ab4343396fbe0f7a1c7ac4f01d0eb9acffe4202/misc/hashverify.c) to ensure that the same hashes are implemented; this avoids the need for lengthy test vectors.
+- Use [verification codes](https://gitlab.com/fwojcik/smhasher3/-/blob/6ab4343396fbe0f7a1c7ac4f01d0eb9acffe4202/misc/hashverify.c) to ensure that the same hashes are implemented; this avoids the need for lengthy test vectors:
     ```c
     0x7140CABC, // MuseAir
     0x0B8F0243, // MuseAir.folded
@@ -148,12 +154,7 @@ state[2] ^= input[3];
 (lo1, hi1) = wide_mul(state[1], state[2]);
 state[1] = lo0 ^ hi1;
 
-state[2] ^= input[4];
-state[3] ^= input[5];
-(lo1, hi1) = wide_mul(state[2], state[3]);
-state[2] = lo1 ^ hi2;
-
-...
+// ...3 more sections...
 
 state[5] ^= input[10];
 state[0] ^= input[11];
@@ -174,41 +175,27 @@ Because earlier inputs have already permeated the accumulator array, even if a b
 in most cases, it only corrupts the **most recent 8 bytes** (does not affect the hash output).
 Unlike wyhash or rapidhash, blinding multiplications can easily corrupt **a moderate portion** of past bytes!
 
-3. This structure interleaves the wide multiplication result. Thus, for general inputs, the probability of a blinding multiplication leading to an accumulator zero out is only $2^{-127}$, far lower than the $2^{-63}$ found in wyhash and rapidhash. The reasoning is as follows:
+3. This structure interleaves the wide multiplication result. Thus, for general inputs, the probability of a blinding multiplication leading to an accumulator zero out is only $2^{-122}$, far lower than the $2^{-63}$ found in wyhash and rapidhash. Moreover, the impact of blinding multiplication is localized because earlier inputs have already permeated the accumulator array.
 
-    - For general inputs, each `input[N]` can be treated as an independent random variable with $2^{64}$ possible states.
-
-    - In wyhash and rapidhash, when `input[0] == lane0` OR `input[1] == SECRET[0]`, both inputs corrupted. The probability of this occurring is $2^{-64} \times 2 = 2^{-63}$. Following this:
-        - `lane0` immediately collapses to zero. Due to the lack of inter-lane diffusion, a moderate portion of past inputs was also corrupted.
-
-    - In the *BFast* variant, `input[0]` corrupted only when `input[1] == state[1]`, with a probability of $2^{-64}$. However:
-        - `state[0]` is highly unlikely to collapse to zero, thanks to the lagged mixing of multiplication results.
-        - For `state[0]` to zero out, `lo5` must also be zero. This requires the previous step to have also encountered a blinding multiplication (where `input[-2] == state[5]` OR `input[-1] == state[0]`), which has a probability of $2^{-63}$.
-        - Thus, the cumulative probability of `state[0]` zero out is $2^{-64} \times 2^{-63} = 2^{-127}$.
-        - Even in such an event, the impact is localized because earlier inputs have already permeated the accumulator array.
-
-4. This structure is designed to be highly conducive to instruction-level parallelism (ILP). Throughput should reach the theoretical limits of modern processors (pure scalar, performing 1 multiplication and 3 XORs per 16 bytes), while maintaining quality above the baseline.
+4. This structure is designed to be highly conducive to instruction-level parallelism (ILP). Throughput should reach the theoretical limits of modern processors (pure scalar, performing 1 MUL and 3 XORs per 16 bytes), while maintaining quality above the baseline.
 
 Finally, the *Standard* variant simply replaces all assignments (`=`) in the accumulator array with sub assignments (`-=`),
 completely immunizing the algorithm against blinding multiplication at minimal performance cost.
+(Actually, the order in which the multiplication results are used is also swapped, but this does not affect the conclusion.)
 
-#### Bad seed avoidance
+### Bad seed avoidance
 
-- For long inputs, use masked mixing:
+- For long inputs, the masked mixing:
     ```rs
-    state = [
-        CONSTANT[0] ^ (seed & MASK_A),
-        CONSTANT[1] ^ (seed & MASK_B),
-        ...
-    ];
+    state = [CONST[0] ^ (seed & MASK_A), CONST[1] ^ (seed & MASK_B), ...];
     ```
-    to ensure the initial state contains no zeros.
+    where `MASK_A = 0xAAA...` and `MASK_B = 0x555...`, ensures the initial state contains no zeros.
 
 - For short inputs, the multiplication used to spread the seed takes the form:
     ```rs
-    wide_mul(CONSTANT[2] ^ seed ^ len, CONSTANT[3] ^ len);
+    _used = wide_mul(CONST[2] ^ seed ^ len, CONST[3] ^ len);
     ```
-    ensuring that unique seed and length information is always mixed into the state.
+    ensures that unique seed and length information is always mixed into the state.
 
 
 ## License
@@ -222,4 +209,6 @@ All other code in this repository is dual-licensed under MIT and Apache 2.0, at 
 [wyhash]: https://github.com/wangyi-fudan/wyhash
 [rapidhash]: https://github.com/Nicoshev/rapidhash
 [komihash]: https://github.com/avaneev/komihash
-[SMHasher3]: https://gitlab.com/fwojcik/smhasher3
+[SMHasher3]: https://gitlab.com/fwojcik/smhasher3/-/blob/main/results/README.md#passing-hashes
+[foldhash]: https://github.com/orlp/foldhash
+[ahash]: https://github.com/tkaitchuck/ahash
